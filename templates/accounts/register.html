@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>إنشاء حساب - منصة إقراء</title>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: { DEFAULT: "#2E7D32", light: "#4CAF50", dark: "#1B5E20" },
+            "background-light": "#F7F9F9",
+            "background-dark": "#121212",
+            "surface-light": "#FFFFFF",
+            "surface-dark": "#1E1E1E",
+            "text-light": "#212121",
+            "text-dark": "#E0E0E0",
+            "text-muted-light": "#616161",
+            "text-muted-dark": "#BDBDBD",
+            "border-light": "#E0E0E0",
+            "border-dark": "#424242",
+            error: "#D32F2F",
+          },
+          fontFamily: { display: ["Cairo", "sans-serif"] },
+          borderRadius: { xl: "16px", lg: "12px" },
+          boxShadow: { "soft-subtle":"0 4px 12px 0 rgba(0,0,0,.05)", "soft-medium":"0 8px 30px 0 rgba(0,0,0,.1)" },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    body { font-family: 'Cairo', sans-serif; }
+
+    .form-input-group { position: relative; }
+    .form-input-group label{
+      position:absolute; top:50%; right:1rem; transform:translateY(-50%);
+      background-color:var(--label-bg, white); padding:0 .25rem; color:#616161;
+      font-size:1rem; transition:all .2s ease-in-out; pointer-events:none;
+    }
+    .dark .form-input-group label { --label-bg:#1E1E1E; color:#BDBDBD; }
+    .form-input:focus~label, .form-input:not(:placeholder-shown)~label{
+      top:0; font-size:.875rem; color:#2E7D32;
+    }
+
+    .loading-bar{
+      position:absolute; top:0; left:0; right:0; height:4px; background:#A5D6A7;
+      overflow:hidden; border-radius:16px 16px 0 0;
+    }
+    .loading-bar::before{
+      content:''; position:absolute; inset:0 0 0 0; width:50%; background:#2E7D32;
+      animation:loading 1.5s infinite linear;
+    }
+    @keyframes loading{ from{transform:translateX(-100%);} to{transform:translateX(200%);} }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-display flex items-center justify-center min-h-screen p-4">
+  <div class="w-full max-w-5xl mx-auto">
+    <!-- Header -->
+    <div class="flex flex-col items-center justify-center mb-8">
+      <div class="w-24 h-24 bg-primary-light dark:bg-primary-dark rounded-full flex items-center justify-center mb-4 shadow-soft-subtle">
+        <span class="material-symbols-outlined text-5xl text-white">menu_book</span>
+      </div>
+      <h1 id="form-title" class="text-4xl font-black tracking-tight">إنشاء حساب جديد</h1>
+      <p id="form-subtitle" class="text-lg text-text-muted-light dark:text-text-muted-dark mt-2">ابدأ رحلتك في تعلم وتعليم القرآن الكريم</p>
+    </div>
+
+    <!-- Card -->
+    <div id="registration-card" class="bg-surface-light dark:bg-surface-dark p-8 sm:p-10 rounded-xl shadow-soft-medium relative overflow-hidden">
+      <!-- Role selector -->
+      <div class="mb-8">
+        <p class="text-center font-bold text-lg mb-4">اختر نوع الحساب:</p>
+        <div id="role-selector" class="flex border border-border-light dark:border-border-dark rounded-lg p-1 max-w-sm mx-auto bg-gray-100 dark:bg-gray-800">
+          <button type="button" data-role="student" class="w-1/2 py-2.5 px-4 rounded-md text-center bg-primary text-white shadow-md font-bold text-base">طالب</button>
+          <button type="button" data-role="teacher" class="w-1/2 py-2.5 px-4 rounded-md text-center text-text-muted-light dark:text-text-muted-dark transition-all duration-300 font-bold text-base">معلم</button>
+        </div>
+      </div>
+
+      <!-- مهم: enctype لرفع الملف + أسماء الحقول للباك -->
+      <form id="registration-form" method="post" action="{% url 'accounts:register' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- القيمة التي تُرسل للباك -->
+        <input type="hidden" name="role" id="register-role" value="student" />
+
+        <div class="grid grid-cols-1 md:grid-cols-2 md:gap-x-8 gap-y-8">
+
+          <!-- اسم المستخدم -->
+          <div class="form-input-group">
+            <input id="username" name="username" type="text" placeholder="اسم المستخدم" required
+                   class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+            <label for="username">اسم المستخدم <span class="text-error">*</span></label>
+          </div>
+
+          <!-- البريد الإلكتروني -->
+          <div class="form-input-group">
+            <input id="email" name="email" type="email" placeholder="البريد الإلكتروني" required
+                   class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+            <label for="email">البريد الإلكتروني <span class="text-error">*</span></label>
+          </div>
+
+          <!-- كلمة المرور (password1) -->
+          <div>
+            <div class="form-input-group">
+              <input id="password1" name="password1" type="password" placeholder="كلمة المرور" required
+                     class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+              <label for="password1">كلمة المرور <span class="text-error">*</span></label>
+
+              <button type="button" class="toggle-password absolute inset-y-0 left-3 flex items-center text-text-muted-light dark:text-text-muted-dark hover:text-primary" aria-label="إظهار/إخفاء كلمة المرور">
+                <span class="material-symbols-outlined text-2xl">visibility_off</span>
+              </button>
+            </div>
+
+            <!-- مؤشر القوة (zxcvbn) -->
+            <div class="mt-2 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+              <div id="strength-bar" class="h-full transition-all duration-300" style="width:0%;"></div>
+            </div>
+            <p id="strength-text" class="text-sm text-text-muted-light dark:text-text-muted-dark mt-2">أدخل كلمة مرور قوية.</p>
+          </div>
+
+          <!-- تأكيد كلمة المرور (password2) -->
+          <div class="form-input-group">
+            <input id="password2" name="password2" type="password" placeholder="تأكيد كلمة المرور" required
+                   class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+            <label for="password2">تأكيد كلمة المرور <span class="text-error">*</span></label>
+          </div>
+
+          <!-- حقول المعلم -->
+          <div id="role-specific-fields" class="contents">
+            <div data-role-fields="teacher" class="contents hidden">
+              <div class="form-input-group md:col-span-2">
+                <input id="institution" name="institution" type="text" placeholder="المؤسسة / الجهة (اختياري)"
+                       class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+                <label for="institution">المؤسسة / الجهة (اختياري)</label>
+              </div>
+
+              <div class="form-input-group md:col-span-2">
+                <textarea id="bio" name="bio" rows="3" placeholder="نبذة قصيرة (اختياري)"
+                          class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"></textarea>
+                <label for="bio">نبذة قصيرة (اختياري)</label>
+              </div>
+
+              <div class="md:col-span-2">
+                <label for="certificate" class="block text-base font-medium text-text-muted-light dark:text-text-muted-dark mb-2">إرفاق شهادة أو إجازة (اختياري)</label>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-border-light dark:border-border-dark border-dashed rounded-lg bg-background-light dark:bg-gray-800/50">
+                  <div class="space-y-1 text-center">
+                    <span class="material-symbols-outlined text-5xl text-gray-400">cloud_upload</span>
+                    <div class="flex text-base text-gray-600 dark:text-gray-400">
+                      <label for="certificate" class="relative cursor-pointer bg-transparent rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none">
+                        <span>اختر ملفًا</span>
+                        <input id="certificate" name="certificate" type="file" accept=".pdf,.png,.jpg,.jpeg" class="sr-only"/>
+                      </label>
+                      <p class="pr-1">أو اسحبه وأفلته هنا</p>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">PDF, PNG, JPG بحجم لا يتجاوز 5MB</p>
+                  </div>
+                </div>
+                <div id="file-info" class="mt-2 text-base text-text-muted-light dark:text-text-muted-dark hidden">
+                  <span class="font-medium">الملف المختار:</span> <span id="file-name"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- حقول الطالب -->
+            <div data-role-fields="student" class="contents">
+              <div class="form-input-group">
+                <input id="birth_date" name="birth_date" type="text" placeholder="تاريخ الميلاد" 
+                       onfocus="(this.type='date')" onblur="(this.type='text')"
+                       class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+                <label for="birth_date">تاريخ الميلاد</label>
+              </div>
+
+              <div class="form-input-group">
+                <select id="gender" name="gender"
+                        class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary text-lg">
+                  <option value="" selected hidden disabled></option>
+                  <option value="male">ذكر</option>
+                  <option value="female">أنثى</option>
+                </select>
+                <label for="gender">الجنس</label>
+              </div>
+
+              <div class="form-input-group md:col-span-2">
+                <input id="guardian_phone" name="guardian_phone" type="tel" placeholder="رقم جوال ولي الأمر (اختياري)"
+                       class="form-input w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary placeholder-transparent text-lg"/>
+                <label for="guardian_phone">رقم جوال ولي الأمر (اختياري)</label>
+              </div>
+
+              <div class="form-input-group md:col-span-2">
+                <select id="halaqa" name="halaqa" required
+                        class="form-input w-full max-w-full px-4 py-3.5 rounded-lg bg-transparent border-2 border-border-light dark:border-border-dark focus:outline-none focus:ring-0 focus:border-primary text-lg">
+                  <option value="" {% if not selected_halaqa %}selected{% endif %} hidden disabled>— اختر الحلقة —</option>
+
+                  {% for h in halaqas %}
+                    <option value="{{ h.id }}"
+                      {% if selected_halaqa|stringformat:"s" == h.id|stringformat:"s" %}selected{% endif %}>
+                      {{ h.name }}
+                    </option>
+                  {% empty %}
+                    <option value="" disabled>لا توجد حلقات متاحة حاليًا</option>
+                  {% endfor %}
+                </select>
+                <label for="halaqa">اختيار الحلقة</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-start md:col-span-2 mt-2">
+            <div class="flex items-center h-5">
+              <input id="terms" name="terms" type="checkbox" required
+                     class="h-5 w-5 text-primary focus:ring-primary-light border-gray-300 rounded"/>
+            </div>
+            <div class="mr-3 text-base">
+              <label for="terms" class="text-text-muted-light dark:text-text-muted-dark">
+                أوافق على
+                <a href="#" class="font-bold text-primary hover:underline"
+                   onclick="event.preventDefault(); document.getElementById('terms-modal').classList.remove('hidden');">
+                  الشروط والأحكام وسياسة الخصوصية
+                </a>
+                <span class="text-error">*</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- رسائل Django -->
+        {% if messages %}
+          <div class="mt-6 space-y-2">
+            {% for message in messages %}
+              <div class="text-sm {% if message.tags == 'error' %}text-red-600{% else %}text-green-700{% endif %}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="mt-10">
+          <button id="submit-button" type="submit"
+                  class="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-lg shadow-md text-xl font-bold text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+            إنشاء الحساب
+          </button>
+        </div>
+      </form>
+
+      
+
+      <div class="mt-8 text-center">
+        <p class="text-base text-text-muted-light dark:text-text-muted-dark">
+          لديك حساب بالفعل؟
+          <a href="{% url 'accounts:login' %}" class="font-bold text-primary hover:text-primary-dark dark:hover:text-primary-light hover:underline">تسجيل الدخول</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال الشروط -->
+  <div id="terms-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50 backdrop-blur-sm">
+    <div class="bg-surface-light dark:bg-surface-dark rounded-xl shadow-soft-medium max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 sm:p-8">
+      <div class="flex justify-between items-center border-b pb-4 border-border-light dark:border-border-dark">
+        <h2 class="text-2xl font-bold">الشروط والأحكام</h2>
+        <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" onclick="document.getElementById('terms-modal').classList.add('hidden');">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="mt-6 space-y-5 text-text-muted-light dark:text-text-muted-dark text-base leading-relaxed">
+        <p>هذا نص تجريبي…</p>
+      </div>
+      <div class="mt-8 text-left">
+        <button class="py-2.5 px-6 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" onclick="document.getElementById('terms-modal').classList.add('hidden');">
+          أوافق
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- zxcvbn (من غير integrity علشان يتحمّل) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    // اختيار الدور وتحديث hidden input
+    const roleSelector = document.getElementById('role-selector');
+    const roleButtons  = roleSelector ? roleSelector.querySelectorAll('button') : [];
+    const roleInput    = document.getElementById('register-role');
+
+    // مراجع حقول الطالب اللي بتسبب منع الإرسال لو كانت required
+    const fldHalaqa    = document.getElementById('halaqa');
+    const fldBirthDate = document.getElementById('birth_date');
+    const fldGender    = document.getElementById('gender');
+
+    function setStudentRequired(on) {
+      if (fldHalaqa)    fldHalaqa.required    = on;
+      if (fldBirthDate) fldBirthDate.required = on;
+      if (fldGender)    fldGender.required    = on;
+    }
+
+    function setRole(role){
+      if (roleInput) roleInput.value = role;
+
+      roleButtons.forEach(btn=>{
+        const on = btn.dataset.role===role;
+        btn.classList.toggle('bg-primary', on);
+        btn.classList.toggle('text-white', on);
+        btn.classList.toggle('shadow-md', on);
+        btn.classList.toggle('text-text-muted-light', !on);
+        btn.classList.toggle('dark:text-text-muted-dark', !on);
+      });
+
+      const teacherBox = document.querySelector('[data-role-fields="teacher"]');
+      const studentBox = document.querySelector('[data-role-fields="student"]');
+      if (teacherBox) teacherBox.classList.toggle('hidden', role!=='teacher');
+      if (studentBox) studentBox.classList.toggle('hidden', role!=='student');
+
+      // أهم إضافة: required لحقول الطالب
+      setStudentRequired(role === 'student');
+
+      const titleEl = document.getElementById('form-title');
+      const subEl   = document.getElementById('form-subtitle');
+      const submit  = document.getElementById('submit-button');
+      if (titleEl) titleEl.textContent = (role==='teacher') ? 'إنشاء حساب معلم' : 'إنشاء حساب طالب';
+      if (subEl)   subEl.textContent   = (role==='teacher') ? 'أكمل بياناتك لتقديم طلب الانضمام كمعلم' : 'أكمل بياناتك للانضمام كطالب';
+      if (submit)  submit.textContent  = (role==='teacher') ? 'إنشاء حساب معلم' : 'إنشاء حساب طالب';
+    }
+
+    roleButtons.forEach(btn => btn.addEventListener('click', ()=>setRole(btn.dataset.role)));
+    setRole('student'); // الافتراضي
+
+    // مؤشر قوة كلمة السر باستخدام zxcvbn
+    const passwordInput = document.getElementById('password1');
+    const confirmInput  = document.getElementById('password2');
+    const strengthBar   = document.getElementById('strength-bar');
+    const strengthText  = document.getElementById('strength-text');
+    const eyeButtons    = document.querySelectorAll('.toggle-password');
+    let passwordsVisible = false;
+
+    function updateStrengthMeter(pw){
+      if (!pw || typeof zxcvbn === 'undefined') {
+        if (strengthBar)  { strengthBar.style.width = '0%'; strengthBar.className = 'h-full transition-all duration-300'; }
+        if (strengthText) strengthText.textContent = 'أدخل كلمة مرور قوية.';
+        return;
+      }
+      const result = zxcvbn(pw);
+      const score = result.score; // 0..4
+      const widths = ['10%','30%','50%','75%','100%'];
+      const colors = ['bg-red-500','bg-orange-500','bg-yellow-500','bg-blue-500','bg-green-500'];
+      const labels = ['ضعيفة جدًا','ضعيفة','متوسطة','جيدة','قوية'];
+      if (strengthBar)  { strengthBar.style.width = widths[score]; strengthBar.className = 'h-full transition-all duration-300 ' + colors[score]; }
+      if (strengthText) strengthText.textContent = `قوة كلمة المرور: ${labels[score]}`;
+    }
+
+    if (passwordInput) passwordInput.addEventListener('input', ()=>updateStrengthMeter(passwordInput.value));
+    updateStrengthMeter('');
+
+    function setPasswordsVisible(show){
+      passwordsVisible = show;
+      if (passwordInput) passwordInput.type = show ? 'text' : 'password';
+      if (confirmInput)  confirmInput.type  = show ? 'text' : 'password';
+      eyeButtons.forEach(btn=>{
+        const icon = btn.querySelector('.material-symbols-outlined');
+        if (icon) icon.textContent = show ? 'visibility' : 'visibility_off';
+      });
+    }
+    eyeButtons.forEach(btn => btn.addEventListener('click', ()=>setPasswordsVisible(!passwordsVisible)));
+    setPasswordsVisible(false);
+
+    // عرض اسم الملف المرفوع (اختياري)
+    const certInput = document.getElementById('certificate');
+    if (certInput){
+      certInput.addEventListener('change', function(){
+        const f = this.files[0];
+        const info = document.getElementById('file-info');
+        const name = document.getElementById('file-name');
+        if (info && name){
+          if (f){ info.classList.remove('hidden'); name.textContent = f.name; }
+          else  { info.classList.add('hidden');    name.textContent = ''; }
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>

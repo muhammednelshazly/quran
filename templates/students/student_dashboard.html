@@ -1,0 +1,475 @@
+{% load static %}
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Hifdh - Student Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#386641",
+            "primary-accent": "#4d8c59",
+            "background-light": "#f7f9fc",
+            "background-dark": "#121212",
+            "sidebar-light": "#ffffff",
+            "sidebar-dark": "#1a1a1a",
+            "content-light": "#212529",
+            "content-dark": "#e9ecef",
+            "card-light": "#ffffff",
+            "card-dark": "#1e1e1e",
+            "secondary-light": "#6c757d",
+            "secondary-dark": "#adb5bd",
+            "border-light": "#e9ecef",
+            "border-dark": "#343a40",
+            warning: "#f59e0b",
+            danger: "#e63946",
+            success: "#386641",
+          },
+          fontFamily: { display: ["Cairo","sans-serif"] },
+        }
+      }
+    }
+  </script>
+  <style>
+    .material-symbols-outlined{font-variation-settings:"FILL" 0,"wght" 400,"GRAD" 0,"opsz" 24}
+    [data-tab-content]{display:none}
+    .active[data-tab-content]{display:block}
+    .tab-button.active{background-color:#386641;color:#fff}
+  </style>
+</head>
+
+<body class="bg-background-light font-display text-content-light dark:bg-background-dark dark:text-content-dark">
+<div class="relative min-h-screen">
+
+  <!-- Header -->
+  <header class="fixed top-0 left-0 right-0 z-40 bg-card-light shadow-md dark:bg-card-dark">
+    <div class="mx-auto flex h-24 items-center justify-between px-4">
+      <div class="flex items-center gap-4">
+        <img src="{{ profile.avatar_url }}" alt="صورة الحساب"
+             class="h-14 w-14 rounded-full border-2 border-primary-accent object-cover">
+        <div class="hidden sm:block">
+          <div class="flex items-center gap-6">
+            <div>
+              <h1 class="text-lg font-bold">{{ user.get_full_name|default:user.username }}</h1>
+              <p class="text-sm text-secondary-light">الحلقة: {{ profile.halaqa|default:"—" }}</p>
+            </div>
+            <div>
+              <p class="text-xs text-secondary-light dark:text-secondary-dark">الحالة:
+                <span class="font-semibold text-green-500">{{ profile.status|default:"حاضر" }}</span>
+              </p>
+              <p class="mt-1 text-xs text-secondary-light dark:text-secondary-dark">{{ h_date }} - {{ g_date }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div class="hidden lg:flex items-center gap-4">
+          <button class="rounded-full p-2"><span class="material-symbols-outlined text-2xl text-primary dark:text-primary-accent">notifications</span></button>
+          <button class="rounded-full p-2"><span class="material-symbols-outlined text-2xl text-primary dark:text-primary-accent">settings</span></button>
+        </div>
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="flex items-center gap-2 rounded-full bg-red-100 py-2.5 px-5 text-sm font-bold text-danger hover:bg-red-200 dark:bg-red-500/20 dark:hover:bg-red-500/30">
+            <span class="material-symbols-outlined">logout</span><span class="hidden sm:inline">تسجيل الخروج</span>
+          </button>
+        </form>
+        <button id="menu-toggle" class="lg:hidden rounded-full p-2"><span class="material-symbols-outlined text-2xl text-primary dark:text-primary-accent">menu</span></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed top-0 left-0 z-30 flex h-full w-80 flex-col gap-6 border-r border-border-light bg-sidebar-light px-6 pt-28 shadow-subtle transition-transform transform -translate-x-full lg:translate-x-0 dark:border-border-dark dark:bg-sidebar-dark">
+    <div class="flex flex-col rounded-xl border border-border-light bg-card-light p-5 shadow-md dark:border-border-dark dark:bg-card-dark">
+      <h3 class="mb-3 text-base font-bold text-primary">التقييم الأسبوعي</h3>
+      <div class="mb-3 flex items-center justify-center">
+        <div class="relative h-28 w-28">
+          <svg class="h-full w-full" viewBox="0 0 36 36">
+            <path class="text-gray-200 dark:text-gray-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke-width="3.5"></path>
+            <path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831" fill="none" stroke-dasharray="{{ weekly_score|default:0 }}, 100" stroke-linecap="round" stroke-width="3.5"></path>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-3xl font-bold text-primary">{{ weekly_score }}%</span>
+          </div>
+        </div>
+      </div>
+      <p class="text-center text-sm text-secondary-light dark:text-secondary-dark">ممتاز! حافظ على هذا المستوى الرائع.</p>
+    </div>
+
+    <div class="flex flex-col rounded-xl border border-border-light bg-card-light p-5 shadow-md dark:border-border-dark dark:bg-card-dark">
+      <h3 class="mb-4 text-base font-bold text-primary">الحضور الأسبوعي</h3>
+      <div class="flex items-center justify-around">
+        {% for day in week_attendance %}
+          {% with s=day.status wd=day.date|date:"w" %}
+            <div class="flex flex-col items-center gap-1.5">
+              <span class="text-xs text-secondary-light">
+                {% if wd == '6' %}سـ
+                {% elif wd == '0' %}أحـ
+                {% elif wd == '1' %}اثـ
+                {% elif wd == '2' %}ثـ
+                {% elif wd == '3' %}أر
+                {% elif wd == '4' %}خـ
+                {% elif wd == '5' %}جـ
+                {% endif %}
+              </span>
+
+              {% if s == "present" %}
+                <span class="material-symbols-outlined text-2xl text-success">check_circle</span>
+              {% elif s == "late" %}
+                <span class="material-symbols-outlined text-2xl text-warning">error</span>
+              {% elif s == "absent" %}
+                <span class="material-symbols-outlined text-2xl text-danger">cancel</span>
+              {% else %} {# future #}
+                <span class="material-symbols-outlined text-2xl text-secondary-light">radio_button_unchecked</span>
+              {% endif %}
+            </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+
+    </div>
+
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center justify-between rounded-xl border border-border-light bg-card-light p-4 shadow-md dark:border-border-dark dark:bg-card-dark">
+        <span class="text-base font-bold">آية</span>
+        <div class="flex items-center gap-3"><span class="material-symbols-outlined text-4xl text-primary-accent">menu_book</span><span class="text-2xl font-bold text-primary">{{ ayah_count }}</span></div>
+      </div>
+      <div class="flex items-center justify-between rounded-xl border border-border-light bg-card-light p-4 shadow-md dark:border-border-dark dark:bg-card-dark">
+        <span class="text-base font-bold">إتقان</span>
+        <div class="flex items-center gap-3"><span class="material-symbols-outlined text-4xl text-primary-accent">task_alt</span><span class="text-2xl font-bold text-primary">{{ accuracy_pct }}%</span></div>
+      </div>
+      <div class="flex items-center justify-between rounded-xl border border-border-light bg-card-light p-4 shadow-md dark:border-border-dark dark:bg-card-dark">
+        <span class="text-base font-bold">حضور</span>
+        <div class="flex items-center gap-3"><span class="material-symbols-outlined text-4xl text-primary-accent">pie_chart</span><span class="text-2xl font-bold text-primary">{{ presence_pct }}%</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="pt-28 lg:pl-80">
+    <div class="container mx-auto px-6 pb-12">
+
+      <div class="mb-8 flex justify-center">
+        <div class="flex items-center rounded-xl border border-border-light bg-card-light p-1 shadow-md dark:border-border-dark dark:bg-card-dark">
+          <button class="tab-button active rounded-lg py-2 px-8 text-lg font-bold" data-tab-target="#recitations">التسميعات المطلوبة</button>
+          <button class="tab-button rounded-lg py-2 px-8 text-lg font-bold text-secondary-light dark:text-secondary-dark" data-tab-target="#reviews">المراجعات المطلوبة</button>
+        </div>
+      </div>
+
+      <!-- Recitations -->
+      <div class="active" data-tab-content id="recitations">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {% for r in recitations %}
+          {% with sub=r.sub %}
+          <div class="flex flex-col gap-2 rounded-xl border border-border-light bg-card-light p-6 shadow-md dark:border-border-dark dark:bg-card-dark" id="recard-{{ r.id }}">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="text-lg font-bold">{{ r.surah }} {{ r.range_text }}</h4>
+                <div class="mt-1 flex items-center gap-1.5 text-secondary-light dark:text-secondary-dark">
+                  <span class="material-symbols-outlined text-base">calendar_today</span>
+                  <p class="text-sm">
+                    موعد التسليم:
+                    {% if r.deadline %}
+                      {{ r.deadline|date:"Y-m-d" }} {{ r.deadline|date:"H:i" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex-shrink-0">
+                {% if sub and sub.status == "graded" %}
+                  <div class="text-xs font-bold text-center {% if sub.score|default:0 >= 8 %}text-success{% else %}text-danger{% endif %}">
+                    <span>النتيجة</span>
+                    <p>{{ sub.score|default:"—" }}/10</p>
+                  </div>
+                {% elif sub and sub.status == "submitted" %}
+                  <span class="inline-flex items-center rounded-full bg-warning/20 px-3 py-1 text-xs font-bold text-warning">في انتظار التصحيح</span>
+                {% else %}
+                  {% if r.deadline and r.deadline < now %}
+                    <span class="inline-flex items-center rounded-full bg-danger/20 px-3 py-1 text-xs font-bold text-danger">متأخر</span>
+                  {% else %}
+                    <span class="inline-flex items-center rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">جديد</span>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+
+            {% if sub and sub.status == "graded" %}
+              <div class="my-2 border-t border-border-light dark:border-border-dark"></div>
+              <h5 class="text-sm font-bold text-secondary-light dark:text-secondary-dark">النتيجة:</h5>
+              <div class="flex items-center justify-between text-sm">
+                <span class="font-semibold">التقييم:
+                  <span class="font-bold {% if sub.score|default:0 >= 8 %}text-success{% else %}text-danger{% endif %}">{{ sub.score|default:"—" }}/10</span>
+                </span>
+                <span class="font-semibold">الأحكام:
+                  <span class="font-bold text-warning">{{ sub.rules|default:"—" }}/5</span>
+                </span>
+                <span class="font-semibold">الحفظ:
+                  <span class="font-bold {% if sub.hifdh|default:0 >= 4 %}text-success{% else %}text-danger{% endif %}">{{ sub.hifdh|default:"—" }}/5</span>
+                </span>
+              </div>
+              {% if sub.notes %}<p class="mt-2 text-sm">{{ sub.notes }}</p>{% endif %}
+            {% endif %}
+
+            <div class="mt-auto pt-4">
+              {% if sub and sub.status == "submitted" %}
+                <button class="w-full cursor-not-allowed rounded-lg bg-gray-200 py-2.5 px-4 font-bold text-gray-500 flex items-center justify-center gap-2" disabled>
+                  <span class="material-symbols-outlined">history</span><span>تم التسليم</span>
+                </button>
+              {% elif sub and sub.status == "graded" %}
+                <form method="post" action="{% url 'accounts:recitation_action' r.id %}" class="mt-auto">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="retry">
+                  <button class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 font-bold text-white hover:bg-primary-accent">
+                    <span class="material-symbols-outlined">replay</span><span>إعادة التسميع</span>
+                  </button>
+                </form>
+              {% else %}
+                <button
+                  class="open-recitation mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 font-bold text-white hover:bg-primary-accent"
+                  data-id="{{ r.id }}"
+                  data-title="{{ r.surah }} {{ r.range_text }}"
+                  data-submit-url="{% url 'accounts:recitation_submit' r.id %}">
+                  <span class="material-symbols-outlined">play_arrow</span><span>ابدأ التسميع</span>
+                </button>
+              {% endif %}
+            </div>
+          </div>
+          {% endwith %}
+          {% empty %}
+            <p class="text-sm text-secondary-light">لا توجد تسميعات.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Reviews tab (later) -->
+      <div data-tab-content id="reviews">
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {% for v in reviews %}
+          {% empty %}
+            <p class="text-sm text-secondary-light">لا توجد مراجعات.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if messages %}
+      <div class="mt-8">
+        {% for message in messages %}
+          <div class="mb-2 text-sm {% if 'success' in message.tags %}text-green-600{% elif 'error' in message.tags %}text-red-600{% else %}text-gray-700{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div>
+  </main>
+</div>
+
+<!-- ===== Modal: تسجيل التلاوة ===== -->
+<div id="rec-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-gray-900/40 backdrop-blur-sm">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md m-4 p-8 text-center relative">
+    <button id="rec-close" class="absolute top-3 left-3 rounded-full p-1 text-gray-500 hover:bg-gray-100" aria-label="إغلاق">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2" id="rec-title">تسجيل التلاوة</h2>
+      <p class="text-gray-500">اضغط على زر البدء عندما تكون مستعدًا.</p>
+    </div>
+
+    <div class="relative mb-6">
+      <div class="w-24 h-24 bg-primary/10 rounded-full mx-auto flex items-center justify-center">
+        <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center">
+          <span class="material-symbols-outlined text-4xl text-primary" id="mic-icon">mic</span>
+        </div>
+      </div>
+      <p id="rec-timer" class="mt-3 text-sm text-gray-600">00:00</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <button id="rec-start" class="col-span-2 flex items-center justify-center gap-2 w-full bg-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 transition">
+        <span class="material-symbols-outlined">fiber_manual_record</span><span>بدء التسجيل</span>
+      </button>
+      <button id="rec-stop" class="col-span-2 flex items-center justify-center gap-2 w-full bg-red-100 text-red-600 font-bold py-3 px-4 rounded-lg hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500/50 transition opacity-50 cursor-not-allowed" disabled>
+        <span class="material-symbols-outlined">stop_circle</span><span>إيقاف التسجيل</span>
+      </button>
+    </div>
+
+    <audio id="rec-audio" class="w-full mb-4" controls hidden></audio>
+
+    <div class="flex items-center justify-between gap-4">
+      <button id="rec-retry" class="flex items-center justify-center gap-2 w-full bg-gray-100 text-gray-700 font-bold py-3 px-4 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition" disabled>
+        <span class="material-symbols-outlined">replay</span><span>إعادة المحاولة</span>
+      </button>
+      <button id="rec-submit" class="w-full bg-primary/10 text-primary font-bold py-3 px-4 rounded-lg hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 transition opacity-50 cursor-not-allowed" disabled>
+        <span>تسليم</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== Helpers =====
+  const getCookie = name => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+  };
+
+  // Sidebar (mobile)
+  const menuToggle = document.getElementById('menu-toggle');
+  const sidebar = document.getElementById('sidebar');
+  if (menuToggle && sidebar) {
+    menuToggle.addEventListener('click', () => sidebar.classList.toggle('-translate-x-full'));
+  }
+
+  // Tabs
+  const tabs = document.querySelectorAll("[data-tab-target]");
+  const tabContents = document.querySelectorAll("[data-tab-content]");
+  const tabButtons = document.querySelectorAll(".tab-button");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const target = document.querySelector(tab.dataset.tabTarget);
+      tabContents.forEach(el => el.classList.remove("active"));
+      target.classList.add("active");
+      tabButtons.forEach(b => { b.classList.remove("active","bg-primary","text-white"); b.classList.add("text-secondary-light"); });
+      tab.classList.add("active","bg-primary","text-white");
+      tab.classList.remove("text-secondary-light");
+    });
+  });
+
+  // ===== Modal + Recording =====
+  const modal = document.getElementById('rec-modal');
+  const recTitle = document.getElementById('rec-title');
+  const recStart = document.getElementById('rec-start');
+  const recStop  = document.getElementById('rec-stop');
+  const recRetry = document.getElementById('rec-retry');
+  const recSubmit= document.getElementById('rec-submit');
+  const recAudio = document.getElementById('rec-audio');
+  const recTimer = document.getElementById('rec-timer');
+  const micIcon  = document.getElementById('mic-icon');
+  const recClose = document.getElementById('rec-close');
+
+  let currentSubmitUrl = null;
+  let currentCardId = null;
+  let mediaRecorder, chunks = [], timerInt, seconds = 0;
+
+  const formatTime = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+  const openModal = (title, submitUrl, cardId) => {
+    recTitle.textContent = title || "تسجيل التلاوة";
+    currentSubmitUrl = submitUrl;
+    currentCardId = cardId;
+    recAudio.hidden = true;
+    recAudio.src = "";
+    recRetry.disabled = true;
+    recSubmit.disabled = true; recSubmit.classList.add('opacity-50','cursor-not-allowed');
+    recStop.disabled = true;  recStop.classList.add('opacity-50','cursor-not-allowed');
+    recStart.disabled = false;
+    recTimer.textContent = "00:00"; seconds = 0;
+    micIcon.textContent = "mic";
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  };
+  const closeModal = () => {
+    try { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); } catch(e){}
+    clearInterval(timerInt);
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  };
+
+  document.querySelectorAll('.open-recitation').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openModal(btn.dataset.title, btn.dataset.submitUrl, `recard-${btn.dataset.id}`);
+    });
+  });
+  if (recClose) recClose.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  // Start recording
+  recStart.addEventListener('click', async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("المتصفح لا يدعم تسجيل الصوت.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunks = [];
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        recAudio.src = URL.createObjectURL(blob);
+        recAudio.hidden = false;
+        recRetry.disabled = false;
+        recSubmit.disabled = false; recSubmit.classList.remove('opacity-50','cursor-not-allowed');
+      };
+      mediaRecorder.start();
+      recStart.disabled = true;
+      recStop.disabled = false;  recStop.classList.remove('opacity-50','cursor-not-allowed');
+      micIcon.textContent = "graphic_eq";
+      seconds = 0; recTimer.textContent = "00:00";
+      clearInterval(timerInt);
+      timerInt = setInterval(() => { seconds++; recTimer.textContent = formatTime(seconds); }, 1000);
+    } catch (err) {
+      alert("تعذر بدء التسجيل: " + err.message);
+    }
+  });
+
+  // Stop
+  recStop.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      clearInterval(timerInt);
+      recStop.disabled = true; recStop.classList.add('opacity-50','cursor-not-allowed');
+      micIcon.textContent = "mic";
+    }
+  });
+
+  // Retry
+  recRetry.addEventListener('click', () => {
+    recAudio.hidden = true;
+    recAudio.src = "";
+    recRetry.disabled = true;
+    recSubmit.disabled = true; recSubmit.classList.add('opacity-50','cursor-not-allowed');
+    recStart.disabled = false;
+    recTimer.textContent = "00:00"; seconds=0;
+  });
+
+  // Submit
+  recSubmit.addEventListener('click', async () => {
+    if (!currentSubmitUrl || chunks.length === 0) return;
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    const fd = new FormData();
+    fd.append('audio', blob, 'recitation.webm');
+    try {
+      const res = await fetch(currentSubmitUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.msg || 'خطأ غير متوقع');
+      if (currentCardId) location.reload();
+      closeModal();
+    } catch (err) {
+      alert("فشل رفع التسميع: " + err.message);
+    }
+  });
+</script>
+</body>
+</html>
