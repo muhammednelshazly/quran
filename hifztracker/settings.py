@@ -51,6 +51,33 @@ TEMPLATES = [
     },
 ]
 
+
+
+
+
+
+ALLOWED_HOSTS = [
+    "quran-production-7f22.up.railway.app",   # دومين Railway بتاعك
+    "127.0.0.1", "localhost",
+]
+
+# من Django 4+ لازم البروتوكول يكون واضح (https://)
+CSRF_TRUSTED_ORIGINS = [
+    "https://quran-production-7f22.up.railway.app",
+    "https://*.up.railway.app",   # مفيد لو بيتغير الساب دومين
+    # لو عندك دومين مخصص ضيفه هنا بنفس الشكل https://yourdomain.com
+]
+
+# طالما بتشتغل HTTPS على Railway:
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+
+# لو السيرفر وراه بروكسي (شائع في Railway):
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
+
+
 WSGI_APPLICATION = 'hifztracker.wsgi.application'
 
 DATABASES = {
