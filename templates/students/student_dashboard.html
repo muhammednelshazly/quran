@@ -131,7 +131,7 @@
                 <span class="material-symbols-outlined text-2xl text-warning">error</span>
               {% elif s == "absent" %}
                 <span class="material-symbols-outlined text-2xl text-danger">cancel</span>
-              {% else %} {# future #}
+              {% else %}
                 <span class="material-symbols-outlined text-2xl text-secondary-light">radio_button_unchecked</span>
               {% endif %}
             </div>
@@ -176,7 +176,14 @@
           <div class="flex flex-col gap-2 rounded-xl border border-border-light bg-card-light p-6 shadow-md dark:border-border-dark dark:bg-card-dark" id="recard-{{ r.id }}">
             <div class="flex items-start justify-between">
               <div>
-                <h4 class="text-lg font-bold">{{ r.surah }} {{ r.range_text }}</h4>
+                <h4 class="text-lg font-bold">
+                  {{ r.surah }}
+                  {% if r.start_ayah and r.end_ayah %}
+                    — من آية {{ r.start_ayah }} إلى {{ r.end_ayah }}
+                  {% else %}
+                    {{ r.range_text }}
+                  {% endif %}
+                </h4>
                 <div class="mt-1 flex items-center gap-1.5 text-secondary-light dark:text-secondary-dark">
                   <span class="material-symbols-outlined text-base">calendar_today</span>
                   <p class="text-sm">
@@ -242,7 +249,7 @@
                 <button
                   class="open-recitation mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 font-bold text-white hover:bg-primary-accent"
                   data-id="{{ r.id }}"
-                  data-title="{{ r.surah }} {{ r.range_text }}"
+                  data-title="{{ r.surah }} {% if r.start_ayah and r.end_ayah %}من آية {{ r.start_ayah }} إلى {{ r.end_ayah }}{% else %}{{ r.range_text }}{% endif %}"
                   data-submit-url="{% url 'accounts:recitation_submit' r.id %}">
                   <span class="material-symbols-outlined">play_arrow</span><span>ابدأ التسميع</span>
                 </button>
@@ -256,10 +263,66 @@
         </div>
       </div>
 
-      <!-- Reviews tab (later) -->
+      <!-- Reviews -->
       <div data-tab-content id="reviews">
         <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {% for v in reviews %}
+          {% with sub=v.sub %}
+          <div class="flex flex-col gap-2 rounded-xl border border-border-light bg-card-light p-6 shadow-md dark:border-border-dark dark:bg-card-dark">
+            <div class="flex items-start justify-between">
+              <div>
+                <h4 class="text-lg font-bold">
+                  {{ v.surah }}
+                  {% if v.start_ayah and v.end_ayah %}
+                    — من آية {{ v.start_ayah }} إلى {{ v.end_ayah }}
+                  {% else %}
+                    {{ v.range_text }}
+                  {% endif %}
+                </h4>
+                <div class="mt-1 flex items-center gap-1.5 text-secondary-light dark:text-secondary-dark">
+                  <span class="material-symbols-outlined text-base">calendar_today</span>
+                  <p class="text-sm">
+                    موعد التسليم:
+                    {% if v.deadline %}
+                      {{ v.deadline|date:"Y-m-d" }} {{ v.deadline|date:"H:i" }}
+                    {% else %} — {% endif %}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex-shrink-0">
+                {% if sub and sub.status == "graded" %}
+                  <span class="inline-flex items-center rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">مراجعة مكتملة</span>
+                {% elif sub and sub.status == "submitted" %}
+                  <span class="inline-flex items-center rounded-full bg-warning/20 px-3 py-1 text-xs font-bold text-warning">في الانتظار</span>
+                {% else %}
+                  {% if v.deadline and v.deadline < now %}
+                    <span class="inline-flex items-center rounded-full bg-danger/20 px-3 py-1 text-xs font-bold text-danger">متأخر</span>
+                  {% else %}
+                    <span class="inline-flex items-center rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">جديد</span>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="mt-auto pt-4">
+              {% if sub %}
+                <form method="post" action="{% url 'accounts:review_action' v.id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="retry">
+                  <button class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 font-bold text-white hover:bg-primary-accent">
+                    <span class="material-symbols-outlined">replay</span><span>إعادة المراجعة</span>
+                  </button>
+                </form>
+              {% else %}
+                <!-- لو عندك endpoint لتسليم مراجعة، بدّل الـ href/الزر هنا -->
+                <button class="w-full rounded-lg bg-gray-200 py-2.5 px-4 font-bold text-gray-500 cursor-not-allowed">
+                  قريبًا: بدء المراجعة
+                </button>
+              {% endif %}
+            </div>
+          </div>
+          {% endwith %}
           {% empty %}
             <p class="text-sm text-secondary-light">لا توجد مراجعات.</p>
           {% endfor %}

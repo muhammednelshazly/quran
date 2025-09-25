@@ -1,37 +1,31 @@
 # apps/accounts/views.py
-from datetime import datetime, timedelta
+
+from datetime import datetime, timedelta, date
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
 from django.utils import timezone
-from hijri_converter import convert
-from django.http import HttpResponseRedirect
 
-from datetime import date
-from django.utils import timezone
 try:
     from hijri_converter import Gregorian as _Gregorian
     HIJRI_OK = True
-
 except Exception:
     HIJRI_OK = False
 
+from django.db.models import Sum, F, IntegerField, ExpressionWrapper
 
 from apps.accounts.models import (
     Recitation,
     RecitationSubmission,
     Attendance,
-    Profile, Halaqa,        # إن كنت تستخدمه في الفيوز
+    Profile, Halaqa,
     Review, ReviewSubmission
 )
-
-
-
 
 # ========= أدوات مساعدة =========
 AR_HIJRI_MONTHS = [
@@ -40,38 +34,54 @@ AR_HIJRI_MONTHS = [
     "رمضان", "شوال", "ذو القعدة", "ذو الحجة",
 ]
 
-
-
-
+# ==========================================================
+#                  --- بداية التعديلات ---
+# ==========================================================
 
 def landing_page(request):
-    # لو عايز تحول تلقائيًا للدashboard بمجرد دخول مستخدم مسجل:
-    # if request.user.is_authenticated:
-    #     return redirect('go')
+    """
+    الصفحة الرئيسية (Landing Page).
+    # تعديل: إذا كان المستخدم مسجلاً دخوله (وليس مشرفًا)، يتم تحويله مباشرةً
+    # إلى بوابة التوجيه go التي سترسله إلى لوحة التحكم المناسبة.
+    # المشرف (Admin) سيتمكن من رؤية الصفحة الرئيسية بشكل طبيعي.
+    """
+    if request.user.is_authenticated and not request.user.is_staff:
+        return redirect('go')
+    
+    # إذا كان المستخدم زائرًا أو مشرفًا، اعرض له الصفحة الرئيسية
     return render(request, 'landing_page.html')
+
 
 def go(request):
     """
     بوابة التوجيه من أزرار الصفحة الرئيسية.
+    تقوم بتوجيه كل مستخدم إلى لوحة التحكم الخاصة به.
     """
     user = request.user
 
-    # لو الدور موجود كـ attribute أو في profile
+    # تعديل: أضفنا التحقق من المشرف (Admin) كأول خطوة
+    # إذا كان المستخدم مشرفًا أو أدمن، وجهه إلى لوحة تحكم الأدمن الرئيسية.
+    if user.is_staff or user.is_superuser:
+        return redirect('admin:index')
+
+    # باقي المنطق يبقى كما هو للطلاب والمعلمين
     role = getattr(user, 'role', None)
     if role is None and hasattr(user, 'profile'):
         role = getattr(user.profile, 'role', None)
 
-    # لو الطالب
     if role == 'student' or user.groups.filter(name__iexact='student').exists():
-        return HttpResponseRedirect('/dashboard/')
+        return redirect('accounts:student_dashboard')
 
-    # لو المعلّم
     if role == 'teacher' or user.groups.filter(name__iexact='teacher').exists():
-        return HttpResponseRedirect('/teacher/dashboard/')
+        return redirect('accounts:teacher_dashboard')
 
-    # لو مفيش دور أو أي مشكلة → رجّعه على اللوجين
-    return HttpResponseRedirect('/login/')
+    # إذا كان المستخدم مسجلاً ولكن ليس له دور (أو أي مشكلة أخرى)،
+    # رجّعه إلى صفحة تسجيل الدخول.
+    return redirect('accounts:login')
 
+# ==========================================================
+#                  --- نهاية التعديلات ---
+# ==========================================================
 
 
 def home_view(request):
@@ -91,7 +101,6 @@ def login_view(request):
             messages.error(request, "من فضلك أكمل كل الحقول واختر نوع الحساب (طالب/معلم).")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # السماح بتسجيل الدخول عبر البريد أو اسم المستخدم
         username = identifier
         if "@" in identifier:
             user_obj = User.objects.filter(email__iexact=identifier).first()
@@ -102,26 +111,23 @@ def login_view(request):
             messages.error(request, "بيانات الدخول غير صحيحة.")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # الإدمن يروح للوحة /admin
+        # تم نقل منطق توجيه الأدمن إلى دالة go ليكون مركزيًا
         if user.is_staff or user.is_superuser:
+            login(request, user) # يجب تسجيل الدخول أولاً
             return redirect("/admin/")
 
-        # تأكيد البروفايل
         if not hasattr(user, "profile"):
             Profile.objects.create(user=user)
 
-        # نوع الحساب لازم يطابق الاختيار
         if user.profile.role != role:
             messages.error(request, "نوع الحساب لا يطابق الاختيار (طالب/معلم).")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # معلم غير معتمد؟
         if role == Profile.ROLE_TEACHER and user.profile.teacher_status != Profile.TEACHER_APPROVED:
             messages.error(request, "حساب المعلم قيد المراجعة من المشرف. سيتم إشعارك عند الاعتماد.")
             return render(request, "accounts/login.html", {"selected_role": role})
 
         login(request, user)
-        # الجلسة: 0 = تُغلق بخروج المتصفح، أو 14 يوم لو Remember me
         request.session.set_expiry(0 if not remember_me else 14 * 24 * 3600)
         messages.success(request, "تم تسجيل الدخول بنجاح.")
         if user.profile.role == Profile.ROLE_STUDENT:
@@ -140,7 +146,6 @@ def logout_view(request):
 
 
 # ========= التسجيل =========
-
 
 def register_view(request):
     def ctx(extra=None):
@@ -201,7 +206,6 @@ def register_view(request):
                 messages.error(request, "صيغة تاريخ الميلاد غير صحيحة.")
                 return render(request, "accounts/register.html", ctx({"selected_role": role}))
 
-            # لازم يختار حلقة صحيحة
             halaqa_obj = None
             if halaqa_input:
                 if str(halaqa_input).isdigit():
@@ -212,7 +216,7 @@ def register_view(request):
                 messages.error(request, "من فضلك اختر حلقة صحيحة من القائمة.")
                 return render(request, "accounts/register.html", ctx({"selected_role": role}))
         else:
-            halaqa_obj = None  # المعلم لا يُربط بحلقة هنا
+            halaqa_obj = None
 
         # 4) إنشاء المستخدم + البروفايل
         try:
@@ -231,10 +235,8 @@ def register_view(request):
                     if getattr(profile, "certificate", None):
                         profile.certificate.delete(save=False)
                     profile.certificate = None
-                    # الطالب دائمًا Approved
                     profile.teacher_status = Profile.TEACHER_APPROVED
                 else:
-                    # المعلّم Pending لحين اعتماد المشرف
                     profile.teacher_status = Profile.TEACHER_PENDING
                     profile.institution = institution
                     profile.bio = bio
@@ -262,24 +264,32 @@ def register_view(request):
             messages.success(request, "تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.")
         return redirect("accounts:login")
 
-    # GET
     return render(request, "accounts/register.html", {"halaqas": Halaqa.objects.all().order_by("name")})
-    # وفي أي return بسبب خطأ أثناء POST:
-    return render(request, "accounts/register.html", {"halaqas": Halaqa.objects.all().order_by("name"),
-                                                    "selected_role": role})
 
 
 # ========= لوحات التحكم =========
 
 def start_of_sat_week(d):
-    # Mon=0..Sun=6  → Saturday=5
     delta = (d.weekday() - 5) % 7
     return d - timedelta(days=delta)
 
 
+def _range_len(obj):
+    try:
+        s = int(getattr(obj, "start_ayah", 0) or 0)
+        e = int(getattr(obj, "end_ayah", 0) or 0)
+        return (e - s + 1) if (s and e and e >= s) else 0
+    except Exception:
+        return 0
+
 
 @login_required(login_url="accounts:login")
 def student_dashboard(request):
+    # تعديل: أضفنا هذا الشرط كحماية
+    # إذا حاول المشرف (Admin) الدخول إلى هذه الصفحة، يتم تحويله إلى لوحة تحكم الأدمن.
+    if request.user.is_staff:
+        return redirect('admin:index')
+
     profile = request.user.profile
     if profile.role != Profile.ROLE_STUDENT:
         return redirect("accounts:teacher_dashboard")
@@ -287,9 +297,7 @@ def student_dashboard(request):
     # ===== تسجيل حضور اليوم تلقائيًا =====
     today = timezone.localdate()
 
-    # لو النهارده "سبت" نبدأ أسبوع جديد: نمسح أي أيام أقدم من النهارده
-    # (كده بننظّف أسابيع قديمة مرة واحدة كل سبت)
-    if today.weekday() == 5:  # Monday=0 ... Saturday=5
+    if today.weekday() == 5:
         Attendance.objects.filter(student=profile, date__lt=today).delete()
 
     Attendance.objects.get_or_create(
@@ -298,25 +306,36 @@ def student_dashboard(request):
         defaults={"status": "present"}
     )
 
-    # نعرض في الواجهة آخر 7 أيام (الأحدث للأقدم ثم نعكس للنظام)
     week_attendance = Attendance.objects.filter(
         student=profile
     ).order_by("-date")[:7][::-1]
 
-    # ===== المهام والتسليمات =====
+    # ===== المهام المعروضة للطالب =====
     recitations = (
         Recitation.objects
         .filter(halaqa=profile.halaqa)
         .select_related("halaqa", "created_by")
     )
-    subs = RecitationSubmission.objects.filter(
+    rec_subs = RecitationSubmission.objects.filter(
         student=profile, recitation__in=recitations
     )
-    sub_map = {s.recitation_id: s for s in subs}
+    rec_sub_map = {s.recitation_id: s for s in rec_subs}
     for r in recitations:
-        setattr(r, "sub", sub_map.get(r.id))
+        setattr(r, "sub", rec_sub_map.get(r.id))
 
-    # ===== التاريخ الميلادي/الهجري =====
+    reviews = (
+        Review.objects
+        .filter(halaqa=profile.halaqa)
+        .select_related("halaqa", "created_by")
+    )
+    rev_subs = ReviewSubmission.objects.filter(
+        student=profile, review__in=reviews
+    )
+    rev_sub_map = {s.review_id: s for s in rev_subs}
+    for rv in reviews:
+        setattr(rv, "sub", rev_sub_map.get(rv.id))
+
+    # ===== التاريخ الميلادي/الهجري (اختياري) =====
     g_date = today.strftime("%Y-%m-%d")
     if HIJRI_OK:
         h = _Gregorian(today.year, today.month, today.day).to_hijri()
@@ -327,12 +346,49 @@ def student_dashboard(request):
     else:
         h_date = ""
 
+    # ===== إحصائيات الأسبوع (من Submissions فقط) =====
+    now = timezone.now()
+    week_ago = now - timedelta(days=7)
+
+    rec_subs_week = RecitationSubmission.objects.filter(
+        student=profile, created_at__gte=week_ago, created_at__lte=now
+    ).select_related("recitation")
+
+    rev_subs_week = ReviewSubmission.objects.filter(
+        student=profile, created_at__gte=week_ago, created_at__lte=now
+    ).select_related("review")
+
+    ACCEPTED_STATUSES = ["accepted", "approved", "graded"]
+    accepted_rec = rec_subs_week.filter(status__in=ACCEPTED_STATUSES)
+    accepted_rev = rev_subs_week.filter(status__in=ACCEPTED_STATUSES)
+    
+    # تم نقل الدالة المساعدة لداخل النطاق أو تعريفها في الأعلى
+    # def _range_len(obj): ...
+
+    ayahs_memorized = 0
+    for s in accepted_rec:
+        ayahs_memorized += _range_len(s.recitation)
+    for s in accepted_rev:
+        ayahs_memorized += _range_len(s.review)
+
+    attempted = rec_subs_week.count() + rev_subs_week.count()
+    accepted  = accepted_rec.count() + accepted_rev.count()
+    proficiency_pct = round((accepted / attempted) * 100, 1) if attempted else 0.0
+
+    held = len(week_attendance)
+    present = sum(1 for a in week_attendance if getattr(a, "status", "") == "present")
+    attendance_pct = round((present / held) * 100, 1) if held else 0.0
+
     ctx = {
         "user": request.user,
         "profile": profile,
         "recitations": recitations,
+        "reviews": reviews,
         "week_attendance": week_attendance,
-        "weekly_score": 90, "ayah_count": 120, "accuracy_pct": 90, "presence_pct": 86,
+        "weekly_score": proficiency_pct,
+        "ayah_count": ayahs_memorized,
+        "accuracy_pct": proficiency_pct,
+        "presence_pct": attendance_pct,
         "g_date": g_date,
         "h_date": h_date,
         "now": timezone.now(),
@@ -340,56 +396,40 @@ def student_dashboard(request):
     return render(request, "students/student_dashboard.html", ctx)
 
 
-
-
-
 @login_required(login_url="accounts:login")
 def teacher_dashboard(request):
+    # تعديل: أضفنا هذا الشرط كحماية
+    # إذا حاول المشرف (Admin) الدخول إلى هذه الصفحة، يتم تحويله إلى لوحة تحكم الأدمن.
+    if request.user.is_staff:
+        return redirect('admin:index')
+
     profile = request.user.profile
     if profile.role != Profile.ROLE_TEACHER:
         return redirect("accounts:student_dashboard")
 
     if profile.teacher_status != Profile.TEACHER_APPROVED:
-        messages.error(request, "حسابك كمعلم قيد المراجعة. تواصل مع المشرف لاعتماد الحساب وإسناد الحلقات.")
         return redirect("accounts:login")
 
-    # الحلقات المسندة لهذا المعلم بواسطة المشرف (M2M)
     my_halaqat = Halaqa.objects.filter(teachers=profile).distinct()
-
-    # إنشاء تسميع جديد
-    if request.method == "POST":
-        halaqa_id = request.POST.get("halaqa_id")
-        surah = request.POST.get("surah", "").strip()
-        range_text = request.POST.get("range_text", "").strip()
-        deadline_str = request.POST.get("deadline")  # اختياري
-
-        if not (halaqa_id and surah and range_text):
-            messages.error(request, "برجاء إدخال بيانات التسميع كاملة.")
-            return redirect("accounts:teacher_dashboard")
-
-        halaqa = get_object_or_404(Halaqa, id=halaqa_id, teachers=profile)
-        Recitation.objects.create(
-            halaqa=halaqa, created_by=profile,
-            surah=surah, range_text=range_text,
-            # deadline: ممكن تحوّل deadline_str إلى datetime لو فعّلت المدخل
-        )
-        messages.success(request, "تم إنشاء التسميع.")
-        return redirect("accounts:teacher_dashboard")
-
-    recs = Recitation.objects.filter(halaqa__in=my_halaqat).select_related('halaqa', 'created_by')
-    return render(request, "teachers/teacher_dashboard.html", {"halaqat": my_halaqat, "recitations": recs})
+    recitations = (Recitation.objects
+                   .filter(halaqa__in=my_halaqat)
+                   .select_related("halaqa", "created_by")
+                   .order_by("-id"))
+    
+    ctx = {
+        "profile": profile,
+        "halaqat": my_halaqat,
+        "recitations": recitations,
+    }
+    return render(request, "teachers/teacher_dashboard.html", ctx)
 
 
 # ========= التسجيل/الرفع للتسميع =========
 
 @login_required(login_url="accounts:login")
 def recitation_start(request, pk):
-    """صفحة واجهة التسجيل (لو بتستخدم صفحة منفصلة)."""
     profile = get_object_or_404(Profile, user=request.user, role=Profile.ROLE_STUDENT)
     recitation = get_object_or_404(Recitation, pk=pk, halaqa=profile.halaqa)
-
-    # لو يوجد تسليم سابق "submitted" أو "graded"، المودال في الـ UI بيدير الحاله.
-    # الصفحة نفسها بتعرض المعلومات فقط.
     return render(request, "students/recitation_record.html", {
         "recitation": recitation,
         "profile": profile,
@@ -399,7 +439,6 @@ def recitation_start(request, pk):
 @require_POST
 @login_required(login_url="accounts:login")
 def recitation_submit(request, pk):
-    """رفع تسجيل صوت التسميع وحفظ/تحديث التسليم."""
     student = request.user.profile
     if student.role != Profile.ROLE_STUDENT:
         return HttpResponseForbidden()
@@ -426,10 +465,6 @@ def recitation_submit(request, pk):
 @require_POST
 @login_required(login_url="accounts:login")
 def recitation_action(request, pk):
-    """
-    زر "إعادة التسميع": احذف التسليم الحالي (لو موجود) علشان
-    الـ submissions_map ما يبقاش فيه العنصر، وساعتها يظهر زر "ابدأ التسميع".
-    """
     profile = get_object_or_404(Profile, user=request.user, role=Profile.ROLE_STUDENT)
     recitation = get_object_or_404(Recitation, pk=pk, halaqa=profile.halaqa)
 
@@ -446,10 +481,6 @@ def recitation_action(request, pk):
 @require_POST
 @login_required(login_url="accounts:login")
 def review_action(request, pk):
-    """
-    زر "إعادة المراجعة": احذف تسليم المراجعة (لو موجود)
-    علشان ترجع بطاقة المراجعة لحالة البداية.
-    """
     profile = get_object_or_404(Profile, user=request.user, role=Profile.ROLE_STUDENT)
     review = get_object_or_404(Review, pk=pk, halaqa=profile.halaqa)
 

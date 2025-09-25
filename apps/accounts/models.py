@@ -11,6 +11,10 @@ from django.templatetags.static import static
 
 
 class Halaqa(models.Model):
+
+    juz_from = models.PositiveSmallIntegerField(null=True, blank=True)
+    juz_to   = models.PositiveSmallIntegerField(null=True, blank=True)
+
     """حلقة تحفيظ: يشارك فيها طلاب، ويشرف عليها معلم/أكثر."""
     name = models.CharField(max_length=150, unique=True)
 
@@ -24,6 +28,21 @@ class Halaqa(models.Model):
 
     def __str__(self):
         return self.name
+
+
+
+
+class Surah(models.Model):
+    name = models.CharField(max_length=64, unique=True)
+    juz_from = models.PositiveSmallIntegerField()  # أول جزء للسورة (تقريبي إداري)
+    juz_to   = models.PositiveSmallIntegerField()  # آخر جزء للسورة
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.name
+
 
 
 class Profile(models.Model):
@@ -109,7 +128,6 @@ class Profile(models.Model):
 
 class Recitation(models.Model):
     """مهمة تسميع جديدة ينشئها المعلّم."""
-
     halaqa = models.ForeignKey(Halaqa, on_delete=models.CASCADE, related_name="recitations")
     created_by = models.ForeignKey(
         Profile,
@@ -117,16 +135,19 @@ class Recitation(models.Model):
         related_name="created_recitations",
         limit_choices_to={"role": "teacher"},
     )
-
-    surah = models.CharField(max_length=100)
-    range_text = models.CharField(max_length=50)
-    deadline = models.DateTimeField(null=True, blank=True)
+    
+    # تم دمج الحقول المكررة وإزالة range_text لأنه يمكن حسابه تلقائياً
+    surah = models.CharField("اسم السورة", max_length=100)
+    start_ayah = models.PositiveIntegerField("من آية", blank=True, null=True)
+    end_ayah = models.PositiveIntegerField("إلى آية", blank=True, null=True)
+    deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
 
     class Meta:
         ordering = ["-id"]
 
     def __str__(self):
-        return f"{self.surah} {self.range_text} – {self.halaqa.name}"
+        return f"{self.surah} (من {self.start_ayah} إلى {self.end_ayah}) – {self.halaqa.name}"
+
 
 
 class RecitationSubmission(models.Model):
@@ -164,7 +185,7 @@ class RecitationSubmission(models.Model):
 
 
 class Review(models.Model):
-    """مهمة مراجعة (قديمة) ينشئها المعلّم."""
+    """مهمة مراجعة ينشئها المعلّم."""
 
     halaqa = models.ForeignKey(Halaqa, on_delete=models.CASCADE, related_name="reviews")
     created_by = models.ForeignKey(
@@ -174,15 +195,18 @@ class Review(models.Model):
         limit_choices_to={"role": "teacher"},
     )
 
-    surah = models.CharField(max_length=100)
-    range_text = models.CharField(max_length=50)
-    deadline = models.DateTimeField(null=True, blank=True)
+    # --- بداية التعديلات ---
+    surah = models.CharField("اسم السورة", max_length=100)
+    start_ayah = models.PositiveIntegerField("من آية", blank=True, null=True)
+    end_ayah = models.PositiveIntegerField("إلى آية", blank=True, null=True)
+    deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
+    # --- نهاية التعديلات (تم حذف range_text) ---
 
     class Meta:
         ordering = ["-id"]
 
     def __str__(self):
-        return f"{self.surah} {self.range_text} – {self.halaqa.name}"
+        return f"مراجعة {self.surah} – {self.halaqa.name}"
 
 
 class ReviewSubmission(models.Model):
