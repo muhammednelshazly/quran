@@ -95,6 +95,10 @@ class Profile(models.Model):
     bio = models.TextField(null=True, blank=True)
     certificate = models.FileField(upload_to="certificates/", null=True, blank=True)
 
+
+    email_notifications = models.BooleanField(default=True)
+    app_notifications = models.BooleanField(default=True)
+
     teacher_status = models.CharField(
         max_length=10,
         choices=TEACHER_STATUS_CHOICES,
@@ -178,6 +182,7 @@ class RecitationSubmission(models.Model):
     notes = models.TextField(null=True, blank=True)
 
     created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ("recitation", "student")
@@ -240,6 +245,7 @@ class ReviewSubmission(models.Model):
     notes = models.TextField(null=True, blank=True)
 
     created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ("review", "student")

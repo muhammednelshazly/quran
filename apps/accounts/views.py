@@ -13,6 +13,11 @@ from django.db.models import Q, Count, Avg, Max
 from itertools import chain
 from operator import attrgetter
 from django.db.models import Q, Count, Avg, Max, F, Subquery, OuterRef
+from .forms import ProfileUpdateForm, CustomPasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
+from .forms import ProfileUpdateForm, PasswordChangeForm
+from django.contrib.sessions.models import Session
+
 try:
     from hijri_converter import Gregorian as _Gregorian
     HIJRI_OK = True
@@ -487,37 +492,47 @@ def teacher_halaqat(request):
     if profile.role != Profile.ROLE_TEACHER:
         return redirect("accounts:student_dashboard")
 
-    my_halaqat = Halaqa.objects.filter(teachers=profile)
+    # جلب الحلقات مع حساب عدد الطلاب لكل حلقة
+    my_halaqat_query = Halaqa.objects.filter(teachers=profile).annotate(
+        student_count=Count('students', distinct=True)
+    )
 
-    # --- بداية منطق الفرز ---
-    sort_option = request.GET.get('sort', 'name_asc') # الافتراضي هو الترتيب الأبجدي
+    # --- منطق الفرز (تم تحسينه ليعمل مع anntotations) ---
+    sort_option = request.GET.get('sort', 'name_asc')
 
     if sort_option == 'name_desc':
-        my_halaqat = my_halaqat.order_by('-name')
+        my_halaqat_query = my_halaqat_query.order_by('-name')
     elif sort_option == 'students_desc':
-        my_halaqat = my_halaqat.annotate(student_count=Count('students')).order_by('-student_count')
+        my_halaqat_query = my_halaqat_query.order_by('-student_count')
     elif sort_option == 'students_asc':
-        my_halaqat = my_halaqat.annotate(student_count=Count('students')).order_by('student_count')
+        my_halaqat_query = my_halaqat_query.order_by('student_count')
     else: # name_asc هو الافتراضي
-        my_halaqat = my_halaqat.order_by('name')
-    # --- نهاية منطق الفرز ---
+        my_halaqat_query = my_halaqat_query.order_by('name')
 
+    # --- حساب متوسط الأداء (كنسبة إنجاز) لكل حلقة ---
     halaqat_with_stats = []
-    for halaqa in my_halaqat:
-        student_count = halaqa.students.count()
-        completion_percentage = 75 # مثال ثابت
+    for halaqa in my_halaqat_query:
+        # حساب متوسط الدرجات من تسليمات التسميع فقط
+        avg_score_query = RecitationSubmission.objects.filter(
+            recitation__halaqa=halaqa, status='graded'
+        ).aggregate(avg=Avg('score'))
+        
+        # تحويل المتوسط (من 10) إلى نسبة مئوية
+        avg_performance_percentage = round((avg_score_query['avg'] or 0) * 10, 1)
+
         halaqat_with_stats.append({
             'halaqa': halaqa,
-            'student_count': student_count,
-            'completion_percentage': completion_percentage,
+            'student_count': halaqa.student_count,
+            'completion_percentage': avg_performance_percentage,
         })
 
     context = {
         'halaqat_list': halaqat_with_stats,
-        'current_sort': sort_option # نرسل خيار الفرز الحالي للقالب
+        'current_sort': sort_option
     }
     
     return render(request, 'teachers/halaqat.html', context)
+
 
 
 
@@ -1091,8 +1106,168 @@ def grade_submission(request, submission_id):
 
 
 
+
+
+
+# في ملف: apps/accounts/views.py
+
 @login_required
 def teacher_submissions(request):
-    # في المستقبل، ستقوم بجلب بيانات التسليمات الحقيقية هنا
-    context = {} 
+    teacher_profile = request.user.profile
+    now = timezone.now()
+    one_week_ago = now - timedelta(days=7)
+    
+    # جلب كل التسليمات (التسميع والمراجعة) الخاصة بحلقات هذا المعلم
+    recitation_subs = RecitationSubmission.objects.filter(
+        recitation__halaqa__teachers=teacher_profile
+    ).select_related('student__user', 'recitation', 'recitation__halaqa')
+
+    review_subs = ReviewSubmission.objects.filter(
+        review__halaqa__teachers=teacher_profile
+    ).select_related('student__user', 'review', 'review__halaqa')
+
+    all_submissions_unfiltered = list(chain(recitation_subs, review_subs))
+    
+    # =============================================================
+    # ===== بداية: منطق الفلترة الجديد لنوع المهمة =====
+    # =============================================================
+
+    task_type_filter = request.GET.get('type', 'all') # الافتراضي هو 'all'
+    if task_type_filter == 'recitation':
+        # hasattr(s, 'recitation') للتحقق إذا كان الكائن من نوع RecitationSubmission
+        all_submissions_filtered_by_type = [s for s in all_submissions_unfiltered if hasattr(s, 'recitation')]
+    elif task_type_filter == 'review':
+        # hasattr(s, 'review') للتحقق إذا كان الكائن من نوع ReviewSubmission
+        all_submissions_filtered_by_type = [s for s in all_submissions_unfiltered if hasattr(s, 'review')]
+    else: # 'all'
+        all_submissions_filtered_by_type = all_submissions_unfiltered
+
+    # ترتيب القائمة النهائية بعد فلترتها حسب النوع
+    all_submissions = sorted(
+        all_submissions_filtered_by_type,
+        key=lambda x: x.created_at,
+        reverse=True
+    )
+
+    # فلترة حسب الحالة (من الرابط) - تعمل على القائمة المفلترة بالفعل حسب النوع
+    status_filter = request.GET.get('status', 'submitted')
+    if status_filter in ['submitted', 'graded', 'reviewing']:
+        submissions = [s for s in all_submissions if s.status == status_filter]
+    else: # حالة 'all'
+        submissions = all_submissions
+        
+    # ===== نهاية: منطق الفلترة الجديد =====
+
+    # حسابات الإحصائيات (تبقى كما هي)
+    pending_count = sum(1 for s in all_submissions_unfiltered if s.status == 'submitted')
+    completed_this_week_count = sum(1 for s in all_submissions_unfiltered if s.status == 'graded' and s.updated_at >= one_week_ago)
+    needs_resubmission_count = sum(1 for s in all_submissions_unfiltered if s.status == 'reviewing')
+    
+    graded_submissions = [s for s in all_submissions_unfiltered if s.status == 'graded' and s.updated_at > s.created_at]
+    # ... (باقي كود حساب متوسط الوقت يبقى كما هو)
+    total_grading_time = timedelta(0)
+    if graded_submissions:
+        for sub in graded_submissions:
+            total_grading_time += sub.updated_at - sub.created_at
+        
+        average_seconds = total_grading_time.total_seconds() / len(graded_submissions)
+        avg_days = int(average_seconds // 86400)
+        avg_hours = int((average_seconds % 86400) // 3600)
+        avg_minutes = int((average_seconds % 3600) // 60)
+
+        if avg_days > 0:
+            average_grading_time = f"{avg_days} يوم"
+        elif avg_hours > 0:
+            average_grading_time = f"{avg_hours} ساعة"
+        else:
+            average_grading_time = f"{avg_minutes} دقيقة"
+    else:
+        average_grading_time = "N/A"
+
+    context = {
+        'submissions': submissions,
+        'pending_count': pending_count,
+        'completed_this_week_count': completed_this_week_count,
+        'needs_resubmission_count': needs_resubmission_count,
+        'average_grading_time': average_grading_time,
+        'active_filter': status_filter,
+        'active_type_filter': task_type_filter, # <-- نرسل الفلتر الجديد للقالب
+        'teacher_halaqas': Halaqa.objects.filter(teachers=teacher_profile)
+    } 
     return render(request, 'teachers/submissions.html', context)
+
+
+
+
+@login_required
+def teacher_settings_view(request):
+    user = request.user
+    profile = user.profile
+
+    if request.method == 'POST':
+        profile_form = ProfileUpdateForm(request.POST, request.FILES, instance=profile, initial={'username': user.username, 'email': user.email})
+        password_form = PasswordChangeForm(user, request.POST)
+
+        # التحقق أي زر تم الضغط عليه
+        if 'update_profile' in request.POST:
+            if profile_form.is_valid():
+                user.username = profile_form.cleaned_data['username']
+                user.email = profile_form.cleaned_data['email']
+                user.save()
+                profile_form.save()
+
+                # تحديث تفضيلات الإشعارات
+                profile.email_notifications = 'email_notifications' in request.POST
+                profile.app_notifications = 'app_notifications' in request.POST
+                profile.save()
+
+                messages.success(request, 'تم حفظ التغييرات بنجاح.')
+            else:
+                messages.error(request, 'يرجى تصحيح الأخطاء في معلوماتك الشخصية.')
+
+        elif 'change_password' in request.POST:
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                messages.success(request, 'تم تغيير كلمة المرور بنجاح.')
+            else:
+                messages.error(request, 'فشل تغيير كلمة المرور، يرجى مراجعة الأخطاء.')
+        
+        return redirect('accounts:teacher_settings')
+
+    else:
+        profile_form = ProfileUpdateForm(instance=profile, initial={'username': user.username, 'email': user.email})
+        password_form = PasswordChangeForm(user)
+
+    context = {
+        'profile_form': profile_form,
+        'password_form': password_form,
+    }
+    return render(request, 'teachers/teacher_settings.html', context)
+
+
+
+
+@require_POST
+@login_required
+def logout_other_devices_view(request):
+    # الحصول على كل الجلسات الخاصة بالمستخدم الحالي ما عدا الجلسة الحالية
+    current_session_key = request.session.session_key
+    user_sessions = Session.objects.filter(get_decoded__user_id=request.user.id).exclude(session_key=current_session_key)
+    
+    # حذف الجلسات الأخرى
+    user_sessions.delete()
+    
+    return JsonResponse({'status': 'success', 'message': 'تم تسجيل الخروج من جميع الأجهزة الأخرى بنجاح.'})
+
+
+@require_POST
+@login_required
+def delete_account_view(request):
+    user = request.user
+    # بدلاً من الحذف الكامل، من الأفضل تعطيل الحساب
+    user.is_active = False
+    user.save()
+    # يمكنك إضافة أي منطق آخر هنا (مثل تسجيل الخروج)
+    
+    return JsonResponse({'status': 'success', 'message': 'تم حذف حسابك بنجاح.'})

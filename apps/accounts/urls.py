@@ -45,6 +45,21 @@ urlpatterns = [
 
     path('teacher/submissions/', views.teacher_submissions, name='teacher_submissions'),
 
+    path('teacher/settings/', views.teacher_settings_view, name='teacher_settings'),
+
+
+
+
+    
+    # مسار لتسجيل الخروج من الأجهزة الأخرى
+    path('api/logout-other-devices/', views.logout_other_devices_view, name='logout_other_devices'),
+    
+    # مسار لحذف الحساب
+    path('api/delete-account/', views.delete_account_view, name='delete_account'),
+
+
+
+
 
 
 ]

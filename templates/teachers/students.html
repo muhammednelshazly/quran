@@ -5,36 +5,29 @@
 
 {% block extra_css %}
 <style>
-    /* === Final, Robust Modal Styles === */
+    /* Modal styles remain the same and work with dark mode */
     .modal {
         visibility: hidden;
         opacity: 0;
         transition: visibility 0s 0.3s, opacity 0.3s ease-in-out;
     }
-    /* This class will now be added to a SPECIFIC modal to show it */
     .modal.is-visible {
         visibility: visible;
         opacity: 1;
         transition: opacity 0.3s ease-in-out;
     }
-    
     .modal-content {
         transform: scale(0.95);
         opacity: 0;
         transition: all 0.3s ease-in-out;
     }
-    /* When the modal is visible, animate its content in */
     .modal.is-visible .modal-content {
         transform: scale(1);
         opacity: 1;
     }
-
-    /* This class on the BODY is ONLY for preventing scroll */
     .modal-open { 
         overflow: hidden; 
     }
-
-    /* RTL fix for sort icon */
     .rtl-sort-icon {
         transform: scaleX(-1);
     }
@@ -46,51 +39,51 @@
 <div class="max-w-7xl mx-auto">
     <header class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
         <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-4xl text-primary">school</span>
-            <h1 class="text-4xl font-bold">طلاب الحلقات</h1>
+            <span class="material-symbols-outlined text-4xl text-primary dark:text-success">school</span>
+            <h1 class="text-4xl font-bold text-text-primary dark:text-text-primary-dark">طلاب الحلقات</h1>
         </div>
         
         <div class="flex items-center gap-4">
-            <button class="js-open-modal bg-primary/10 text-primary flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors" data-modal-target="#filterModal">
+            <button class="js-open-modal bg-primary/10 text-primary dark:bg-success/20 dark:text-success flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 dark:hover:bg-success/30 transition-colors" data-modal-target="#filterModal">
                 <span class="material-symbols-outlined">filter_list</span>
                 <span>فلترة حسب الحلقة</span>
             </button>
-            <button class="js-open-modal bg-primary/10 text-primary flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors" data-modal-target="#sortModal">
+            <button class="js-open-modal bg-primary/10 text-primary dark:bg-success/20 dark:text-success flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 dark:hover:bg-success/30 transition-colors" data-modal-target="#sortModal">
                 <span class="material-symbols-outlined rtl-sort-icon">swap_vert</span>
                 <span>فرز</span>
             </button>
         </div>
     </header>
 
-    <div class="bg-card rounded-lg shadow-subtle p-4">
+    <div class="bg-card dark:bg-card-dark rounded-lg shadow-subtle p-4">
         <div class="mb-4">
             <div class="relative">
-                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary">search</span>
-                <input id="searchInput" class="w-full bg-background border border-border-color rounded-lg py-3 pr-12 pl-4 focus:ring-primary focus:border-primary placeholder-text-secondary transition-colors" placeholder="ابحث عن طالب بالاسم أو الحلقة..." type="text"/>
+                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark">search</span>
+                <input id="searchInput" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-3 pr-12 pl-4 focus:ring-primary focus:border-primary placeholder-text-secondary dark:placeholder-text-secondary-dark text-text-primary dark:text-text-primary-dark transition-colors" placeholder="ابحث عن طالب بالاسم أو الحلقة..." type="text"/>
             </div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-right">
                 <thead>
-                    <tr class="border-b border-border-color">
-                        <th class="p-5 font-bold text-text-primary">اسم الطالب</th>
-                        <th class="p-5 font-bold text-text-primary">الحلقة</th>
-                        <th class="p-5 font-bold text-text-primary">آخر تسليم</th>
-                        <th class="p-5 font-bold text-text-primary">متوسط الأداء</th>
-                        <th class="p-5 font-bold text-text-primary">إجراءات</th>
+                    <tr class="border-b border-border-color dark:border-border-color-dark">
+                        <th class="p-5 font-bold text-text-primary dark:text-text-primary-dark">اسم الطالب</th>
+                        <th class="p-5 font-bold text-text-primary dark:text-text-primary-dark">الحلقة</th>
+                        <th class="p-5 font-bold text-text-primary dark:text-text-primary-dark">آخر تسليم</th>
+                        <th class="p-5 font-bold text-text-primary dark:text-text-primary-dark">متوسط الأداء</th>
+                        <th class="p-5 font-bold text-text-primary dark:text-text-primary-dark">إجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="studentTableBody">
                     {% for student in students_list %}
-                    <tr class="student-row border-b border-border-color hover:bg-background">
+                    <tr class="student-row border-b border-border-color dark:border-border-color-dark hover:bg-background dark:hover:bg-background-dark">
                         <td class="p-5 align-middle">
                             <div class="flex items-center gap-3">
                                 <img alt="Student Avatar" class="w-12 h-12 rounded-full object-cover" src="{{ student.avatar_url }}"/>
-                                <h2 class="font-bold text-text-primary">{{ student.user.username }}</h2>
+                                <h2 class="font-bold text-text-primary dark:text-text-primary-dark">{{ student.user.username }}</h2>
                             </div>
                         </td>
-                        <td class="p-5 text-text-secondary align-middle">{{ student.halaqa.name }}</td>
-                        <td class="p-5 text-text-secondary align-middle">
+                        <td class="p-5 text-text-secondary dark:text-text-secondary-dark align-middle">{{ student.halaqa.name }}</td>
+                        <td class="p-5 text-text-secondary dark:text-text-secondary-dark align-middle">
                             {% if student.last_submission_date %}
                                 {{ student.last_submission_date|date:"Y-m-d" }}
                             {% else %}
@@ -98,7 +91,7 @@
                             {% endif %}
                         </td>
                         <td class="p-5 align-middle">
-                            <span class="font-bold text-lg {% if student.avg_performance >= 8 %}text-secondary{% else %}text-red-500{% endif %}">
+                            <span class="font-bold text-lg {% if student.avg_performance >= 8 %}text-secondary dark:text-success{% else %}text-red-500 dark:text-red-400{% endif %}">
                                 {% if student.avg_performance is not None %}
                                     {{ student.avg_performance|floatformat:1 }} / 10
                                 {% else %}
@@ -108,7 +101,7 @@
                         </td>
                         <td class="p-5 align-middle">
                             <div class="flex gap-2">
-                                <button class="js-open-modal text-text-secondary hover:text-primary transition-colors p-2 rounded-lg" 
+                                <button class="js-open-modal text-text-secondary dark:text-text-secondary-dark hover:text-primary dark:hover:text-success transition-colors p-2 rounded-lg" 
                                         title="عرض الملف الشخصي"
                                         data-modal-target="#studentProfileModal"
                                         data-name="{{ student.user.username }}"
@@ -119,14 +112,14 @@
                                         data-age="{% if student.birth_date %}{{ student.birth_date|timesince|slice:':2' }} سنوات{% else %}غير مسجل{% endif %}">
                                     <span class="material-symbols-outlined">visibility</span>
                                 </button>
-                                <button class="js-open-modal text-text-secondary hover:text-primary transition-colors p-2 rounded-lg" 
+                                <button class="js-open-modal text-text-secondary dark:text-text-secondary-dark hover:text-primary dark:hover:text-success transition-colors p-2 rounded-lg" 
                                         title="إضافة مهمة/تسميع"
                                         data-modal-target="#addTaskModal"
                                         data-student-id="{{ student.pk }}"
                                         data-student-name="{{ student.user.username }}">
                                     <span class="material-symbols-outlined">add_task</span>
                                 </button>
-                                <button class="js-delete-student text-text-secondary hover:text-red-600 transition-colors p-2 rounded-lg" 
+                                <button class="js-delete-student text-text-secondary dark:text-text-secondary-dark hover:text-red-600 dark:hover:text-red-500 transition-colors p-2 rounded-lg" 
                                         title="حذف الطالب من الحلقة"
                                         data-student-id="{{ student.pk }}"
                                         data-student-name="{{ student.user.username }}">
@@ -137,7 +130,7 @@
                     </tr>
                     {% empty %}
                     <tr class="student-row">
-                        <td colspan="5" class="p-5 text-center text-text-secondary">لا يوجد طلاب مسجلون في حلقاتك حاليًا.</td>
+                        <td colspan="5" class="p-5 text-center text-text-secondary dark:text-text-secondary-dark">لا يوجد طلاب مسجلون في حلقاتك حاليًا.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -149,29 +142,29 @@
 <div class="modal fixed inset-0 z-50 p-4" id="studentProfileModal">
     <div class="modal-overlay fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm js-close-modal"></div>
     <div class="w-full h-full flex items-center justify-center">
-        <div class="modal-content relative bg-card rounded-lg shadow-2xl w-full max-w-2xl">
-            <button class="absolute top-4 left-4 text-text-secondary hover:text-text-primary transition-colors js-close-modal" title="إغلاق">
+        <div class="modal-content relative bg-card dark:bg-card-dark rounded-lg shadow-2xl w-full max-w-2xl">
+            <button class="absolute top-4 left-4 text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark transition-colors js-close-modal" title="إغلاق">
                 <span class="material-symbols-outlined">close</span>
             </button>
             <div class="p-8">
                 <div class="flex flex-col items-center text-center">
-                    <img id="modal-profile-avatar" alt="Student Avatar" class="w-24 h-24 rounded-full mb-4 ring-4 ring-primary/20 object-cover" src=""/>
-                    <h2 id="modal-profile-name" class="text-3xl font-bold text-text-primary"></h2>
-                    <p id="modal-profile-halaqa" class="text-text-secondary text-lg"></p>
+                    <img id="modal-profile-avatar" alt="Student Avatar" class="w-24 h-24 rounded-full mb-4 ring-4 ring-primary/20 dark:ring-success/20 object-cover" src=""/>
+                    <h2 id="modal-profile-name" class="text-3xl font-bold text-text-primary dark:text-text-primary-dark"></h2>
+                    <p id="modal-profile-halaqa" class="text-text-secondary dark:text-text-secondary-dark text-lg"></p>
                 </div>
-                <div class="border-t border-border-color my-6"></div>
+                <div class="border-t border-border-color dark:border-border-color-dark my-6"></div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 text-center md:text-right">
                     <div>
-                        <p class="text-sm text-text-secondary">رقم ولي الأمر</p>
-                        <p id="modal-profile-phone" class="font-bold text-text-primary"></p>
+                        <p class="text-sm text-text-secondary dark:text-text-secondary-dark">رقم ولي الأمر</p>
+                        <p id="modal-profile-phone" class="font-bold text-text-primary dark:text-text-primary-dark"></p>
                     </div>
                     <div>
-                        <p class="text-sm text-text-secondary">تاريخ الانضمام</p>
-                        <p id="modal-profile-joined" class="font-bold text-text-primary"></p>
+                        <p class="text-sm text-text-secondary dark:text-text-secondary-dark">تاريخ الانضمام</p>
+                        <p id="modal-profile-joined" class="font-bold text-text-primary dark:text-text-primary-dark"></p>
                     </div>
                     <div>
-                        <p class="text-sm text-text-secondary">السن</p>
-                        <p id="modal-profile-age" class="font-bold text-text-primary"></p>
+                        <p class="text-sm text-text-secondary dark:text-text-secondary-dark">السن</p>
+                        <p id="modal-profile-age" class="font-bold text-text-primary dark:text-text-primary-dark"></p>
                     </div>
                 </div>
             </div>
@@ -182,35 +175,35 @@
 <div class="modal fixed inset-0 z-50 p-4" id="addTaskModal">
     <div class="modal-overlay fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm js-close-modal"></div>
     <div class="w-full h-full flex items-center justify-center">
-        <div class="modal-content relative bg-card rounded-lg shadow-2xl w-full max-w-lg">
-            <button class="absolute top-4 left-4 text-text-secondary hover:text-text-primary transition-colors js-close-modal" title="إغلاق">
+        <div class="modal-content relative bg-card dark:bg-card-dark rounded-lg shadow-2xl w-full max-w-lg">
+            <button class="absolute top-4 left-4 text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark transition-colors js-close-modal" title="إغلاق">
                 <span class="material-symbols-outlined">close</span>
             </button>
             <div class="p-8">
-                <h2 class="text-2xl font-bold text-text-primary mb-2">إضافة تسميع لـ: <span id="modal-task-student-name" class="text-primary"></span></h2>
-                <p class="text-text-secondary mb-6">املأ الحقول التالية لتسجيل مهمة تسميع جديدة.</p>
+                <h2 class="text-2xl font-bold text-text-primary dark:text-text-primary-dark mb-2">إضافة تسميع لـ: <span id="modal-task-student-name" class="text-primary dark:text-success"></span></h2>
+                <p class="text-text-secondary dark:text-text-secondary-dark mb-6">املأ الحقول التالية لتسجيل مهمة تسميع جديدة.</p>
 
                 <form id="addTaskForm" action="#" method="POST">
                     {% csrf_token %} 
                     <input type="hidden" id="task-student-id" name="student_id"/>
                     <div class="space-y-4">
                         <div>
-                            <label for="surah" class="block text-sm font-medium text-text-primary mb-1">السورة</label>
-                            <input type="text" id="surah" name="surah" required placeholder="مثال: البقرة" class="w-full bg-background border border-border-color rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary placeholder-text-secondary transition-colors"/>
+                            <label for="surah" class="block text-sm font-medium text-text-primary dark:text-text-primary-dark mb-1">السورة</label>
+                            <input type="text" id="surah" name="surah" required placeholder="مثال: البقرة" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary placeholder-text-secondary dark:placeholder-text-secondary-dark text-text-primary dark:text-text-primary-dark transition-colors"/>
                         </div>
                          <div class="grid grid-cols-2 gap-4">
                             <div>
-                               <label for="start_ayah" class="block text-sm font-medium text-text-primary mb-1">من آية</label>
-                               <input type="number" id="start_ayah" name="start_ayah" required placeholder="1" class="w-full bg-background border border-border-color rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary transition-colors"/>
+                               <label for="start_ayah" class="block text-sm font-medium text-text-primary dark:text-text-primary-dark mb-1">من آية</label>
+                               <input type="number" id="start_ayah" name="start_ayah" required placeholder="1" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary text-text-primary dark:text-text-primary-dark transition-colors"/>
                             </div>
                             <div>
-                               <label for="end_ayah" class="block text-sm font-medium text-text-primary mb-1">إلى آية</label>
-                               <input type="number" id="end_ayah" name="end_ayah" required placeholder="10" class="w-full bg-background border border-border-color rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary transition-colors"/>
+                               <label for="end_ayah" class="block text-sm font-medium text-text-primary dark:text-text-primary-dark mb-1">إلى آية</label>
+                               <input type="number" id="end_ayah" name="end_ayah" required placeholder="10" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary text-text-primary dark:text-text-primary-dark transition-colors"/>
                             </div>
                          </div>
                         <div>
-                            <label for="deadline" class="block text-sm font-medium text-text-primary mb-1">الموعد النهائي (اختياري)</label>
-                            <input type="date" id="deadline" name="deadline" class="w-full bg-background border border-border-color rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary transition-colors"/>
+                            <label for="deadline" class="block text-sm font-medium text-text-primary dark:text-text-primary-dark mb-1">الموعد النهائي (اختياري)</label>
+                            <input type="date" id="deadline" name="deadline" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary text-text-secondary dark:text-text-primary-dark transition-colors"/>
                         </div>
                     </div>
 
@@ -229,16 +222,16 @@
 <div class="modal fixed inset-0 z-50 p-4" id="filterModal">
     <div class="modal-overlay fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm js-close-modal"></div>
     <div class="w-full h-full flex items-center justify-center">
-        <div class="modal-content relative bg-card rounded-lg shadow-2xl w-full max-w-md">
-            <button class="absolute top-4 left-4 text-text-secondary hover:text-text-primary transition-colors js-close-modal" title="إغلاق">
+        <div class="modal-content relative bg-card dark:bg-card-dark rounded-lg shadow-2xl w-full max-w-md">
+            <button class="absolute top-4 left-4 text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark transition-colors js-close-modal" title="إغلاق">
                 <span class="material-symbols-outlined">close</span>
             </button>
             <div class="p-8">
-                <h2 class="text-2xl font-bold text-text-primary mb-6">فلترة الطلاب حسب الحلقة</h2>
+                <h2 class="text-2xl font-bold text-text-primary dark:text-text-primary-dark mb-6">فلترة الطلاب حسب الحلقة</h2>
                 <form id="filterForm">
                     <div class="space-y-4">
-                        <label for="filter_halaqa" class="block text-sm font-medium text-text-primary mb-1">اختر الحلقة</label>
-                        <select id="filter_halaqa" name="halaqa" class="w-full bg-background border border-border-color rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary transition-colors">
+                        <label for="filter_halaqa" class="block text-sm font-medium text-text-primary dark:text-text-primary-dark mb-1">اختر الحلقة</label>
+                        <select id="filter_halaqa" name="halaqa" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary text-text-primary dark:text-text-primary-dark transition-colors">
                             <option value="">عرض جميع الحلقات</option>
                             {% for halaqa in teacher_halaqas %}
                             <option value="{{ halaqa.id }}">{{ halaqa.name }}</option>
@@ -246,7 +239,7 @@
                         </select>
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
-                        <button type="button" class="js-close-modal bg-gray-200 text-text-primary px-6 py-2.5 rounded-lg font-bold hover:bg-gray-300 transition-colors">إلغاء</button>
+                        <button type="button" class="js-close-modal bg-gray-200 dark:bg-gray-700 text-text-primary dark:text-text-primary-dark px-6 py-2.5 rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">إلغاء</button>
                         <button type="submit" class="bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:bg-secondary transition-colors">تطبيق الفلترة</button>
                     </div>
                 </form>
@@ -258,16 +251,16 @@
 <div class="modal fixed inset-0 z-50 p-4" id="sortModal">
     <div class="modal-overlay fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm js-close-modal"></div>
     <div class="w-full h-full flex items-center justify-center">
-        <div class="modal-content relative bg-card rounded-lg shadow-2xl w-full max-w-md">
-            <button class="absolute top-4 left-4 text-text-secondary hover:text-text-primary transition-colors js-close-modal" title="إغلاق">
+        <div class="modal-content relative bg-card dark:bg-card-dark rounded-lg shadow-2xl w-full max-w-md">
+            <button class="absolute top-4 left-4 text-text-secondary dark:text-text-secondary-dark hover:text-text-primary dark:hover:text-text-primary-dark transition-colors js-close-modal" title="إغلاق">
                 <span class="material-symbols-outlined">close</span>
             </button>
             <div class="p-8">
-                <h2 class="text-2xl font-bold text-text-primary mb-6">فرز قائمة الطلاب</h2>
+                <h2 class="text-2xl font-bold text-text-primary dark:text-text-primary-dark mb-6">فرز قائمة الطلاب</h2>
                 <form id="sortForm">
                     <div class="space-y-4">
-                        <label for="sort_by" class="block text-sm font-medium text-text-primary mb-1">الفرز حسب</label>
-                        <select id="sort_by" name="sort" class="w-full bg-background border border-border-color rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary transition-colors">
+                        <label for="sort_by" class="block text-sm font-medium text-text-primary dark:text-text-primary-dark mb-1">الفرز حسب</label>
+                        <select id="sort_by" name="sort" class="w-full bg-background dark:bg-background-dark border border-border-color dark:border-border-color-dark rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary text-text-primary dark:text-text-primary-dark transition-colors">
                             <option value="name_asc">الاسم (أ - ي)</option>
                             <option value="name_desc">الاسم (ي - أ)</option>
                             <option value="performance_desc">متوسط الأداء (الأعلى أولاً)</option>
@@ -276,7 +269,7 @@
                         </select>
                     </div>
                     <div class="mt-6 flex justify-end gap-3">
-                        <button type="button" class="js-close-modal bg-gray-200 text-text-primary px-6 py-2.5 rounded-lg font-bold hover:bg-gray-300 transition-colors">إلغاء</button>
+                        <button type="button" class="js-close-modal bg-gray-200 dark:bg-gray-700 text-text-primary dark:text-text-primary-dark px-6 py-2.5 rounded-lg font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">إلغاء</button>
                         <button type="submit" class="bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:bg-secondary transition-colors">تطبيق الفرز</button>
                     </div>
                 </form>
@@ -288,7 +281,9 @@
 
 
 {% block extra_js %}
+{{ block.super }} {# Inherits the JS from teacher_base.html #}
 <script>
+// All the JS is already compatible with dark mode, no changes needed here.
 document.addEventListener('DOMContentLoaded', function () {
     const body = document.body;
     let activeModal = null;
@@ -357,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function () {
             e.stopPropagation();
             const studentId = btn.dataset.studentId;
             const studentName = btn.dataset.studentName;
-            const url = `/student/${studentId}/unassign/`;
+            const url = `/accounts/student/${studentId}/unassign/`;
 
             if (confirm(`هل أنت متأكد من إزالة الطالب (${studentName}) من حلقته الحالية؟`)) {
                 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
