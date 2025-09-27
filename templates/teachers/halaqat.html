@@ -1,74 +1,574 @@
-{% extends "teacher_base.html" %}
-{% load custom_tags %}
-
-{% block title %}إدارة الحلقات{% endblock %}
-
-{% block content %}
-    <header class="flex items-center justify-between mb-8">
-        <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-4xl text-primary">groups</span>
-            <h1 class="text-3xl font-bold">الحلقات الخاصة بك</h1>
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>منصة آية - التسليمات (واجهة المعلم)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#386641",
+            secondary: "#6A994E",
+            background: "#F7F9FC",
+            card: "#FFFFFF",
+            "text-primary": "#212529",
+            "text-secondary": "#6C757D",
+            warning: "#F59E0B",
+            danger: "#EF4444",
+            success: "#10B981",
+          },
+          fontFamily: {
+            display: ["Cairo", "sans-serif"],
+          },
+          borderRadius: {
+            DEFAULT: "0.5rem",
+            lg: "0.75rem",
+            xl: "1rem",
+            full: "9999px",
+          },
+          boxShadow: {
+            subtle:
+              "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05)",
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    }
+    /* Scrollbar niceties */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+  </style>
+</head>
+<body class="bg-background font-display text-text-primary">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="fixed top-0 right-0 h-full w-64 bg-card p-6 flex flex-col justify-between shadow-subtle">
+      <div>
+        <div class="flex items-center gap-3 mb-10">
+          <div class="bg-primary p-2 rounded-lg">
+            <svg class="text-white" width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"/></svg>
+          </div>
+          <h2 class="text-xl font-bold text-text-primary">منصة آية</h2>
         </div>
-        
-        <div class="relative" x-data="{ open: false }">
-            <button @click="open = !open" class="bg-primary/10 text-primary flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors">
-                <span class="material-symbols-outlined">filter_list</span>
-                <span>فرز</span>
-                <span class="material-symbols-outlined transition-transform" :class="{'rotate-180': open}">expand_more</span>
+        <nav class="flex flex-col gap-4">
+          <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+            <span class="material-symbols-outlined">home</span>
+            <span>الرئيسية</span>
+          </a>
+          <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+            <span class="material-symbols-outlined">groups</span>
+            <span>الحلقات</span>
+          </a>
+          <a class="flex items-center gap-3 px-4 py-2 rounded-lg bg-primary/10 text-primary" href="#">
+            <span class="material-symbols-outlined">task_alt</span>
+            <span>التسليمات</span>
+          </a>
+          <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+            <span class="material-symbols-outlined">school</span>
+            <span>الطلاب</span>
+          </a>
+          <a class="flex items-center gap-3 px-4 py-2 rounded-lg text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors" href="#">
+            <span class="material-symbols-outlined">bar_chart</span>
+            <span>التقارير</span>
+          </a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-3 p-4 bg-background rounded-lg">
+        <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style='background-image:url("https://lh3.googleusercontent.com/aida-public/AB6AXuB3pIPsDW6XnNqwIiJUEm2tt0k8IWZxRkLOz1x9jJPgKJCiF6PkjtbGwJrUELWJmz61L5jPsPLLjSFTKJ0dg03FjWGcVg34CQPFZFuLDMJ98ZRYW3f6RQN6JCfL6xqpawAq6cRiLwZn7eXQILs98PvEEETEs4YwuIBkY7x_7zVZrnnoQ7VrKfAEiZxKLmTTP5ggNb2ZPYrjCvVnxmfvaW-Rmf8ePWMNeudLC48bOYu2CpMxi8ETUvcNhITw9GtJMMxuYFcj7FGljoZ_");'></div>
+        <div>
+          <p class="font-bold text-sm text-text-primary">محمد عبدالله</p>
+          <p class="text-xs text-text-secondary">معلم</p>
+        </div>
+        <button id="toggleDark" class="material-symbols-outlined ml-auto text-text-secondary hover:text-primary transition-colors" title="الوضع الليلي">dark_mode</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="flex-1 mr-64 flex flex-col overflow-hidden">
+      <main class="h-full overflow-y-auto px-6 pt-12 lg:px-8 lg:pt-16">
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-3xl font-bold">التسليمات</h1>
+            <p class="text-text-secondary text-sm mt-1">كل التسميعات والمراجعات من طلابك عبر جميع الحلقات.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="p-2 rounded-full hover:bg-primary/10 text-text-secondary transition-colors" title="الإشعارات">
+              <span class="material-symbols-outlined">notifications</span>
             </button>
-
-            <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 mt-2 w-56 bg-card rounded-lg shadow-lg z-10 border border-gray-200">
-                <a href="?sort=name_asc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'name_asc' %}font-bold text-primary{% endif %}">
-                    الترتيب الأبجدي (أ - ي)
-                </a>
-                <a href="?sort=name_desc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'name_desc' %}font-bold text-primary{% endif %}">
-                    الترتيب الأبجدي (ي - أ)
-                </a>
-                <a href="?sort=students_desc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'students_desc' %}font-bold text-primary{% endif %}">
-                    الأكثر عددًا بالطلاب
-                </a>
-                <a href="?sort=students_asc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'students_asc' %}font-bold text-primary{% endif %}">
-                    الأقل عددًا بالطلاب
-                </a>
-            </div>
-        </div>
+            <button class="p-2 rounded-full hover:bg-primary/10 text-text-secondary transition-colors" title="تحديث">
+              <span class="material-symbols-outlined">refresh</span>
+            </button>
+          </div>
         </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        {% for item in halaqat_list %}
-        <div class="bg-card p-6 rounded-xl shadow-subtle flex flex-col gap-4">
-            <div class="flex justify-between items-start">
-                <div>
-                    <h2 class="text-lg font-bold">{{ item.halaqa.name }}</h2>
-                    <p class="text-sm text-text-secondary">المعلم: {{ request.user.username }}</p>
-                </div>
-                <div class="relative size-16">
-                    <svg class="size-full" viewBox="0 0 36 36">
-                        <circle class="stroke-current text-primary/20" cx="18" cy="18" fill="none" r="16" stroke-width="3"></circle>
-                        <circle class="stroke-current text-primary" cx="18" cy="18" fill="none" r="16" stroke-dasharray="100" stroke-dashoffset="{{ 100|sub:item.completion_percentage }}" stroke-linecap="round" stroke-width="3" transform="rotate(-90 18 18)"></circle>
-                    </svg>
-                    <span class="absolute inset-0 flex items-center justify-center text-sm font-bold text-primary">{{ item.completion_percentage }}%</span>
-                </div>
+        <!-- Controls -->
+        <section class="bg-card rounded-xl shadow-subtle p-4 md:p-6 mb-6">
+          <!-- Tabs -->
+          <div class="flex items-center gap-2 border-b border-background mb-4">
+            <button data-tab="all" class="tab-btn px-4 py-2 rounded-t-lg font-bold text-sm text-primary bg-primary/10">الكل</button>
+            <button data-tab="recite" class="tab-btn px-4 py-2 rounded-t-lg font-bold text-sm text-text-secondary hover:text-primary">التسميعات</button>
+            <button data-tab="review" class="tab-btn px-4 py-2 rounded-t-lg font-bold text-sm text-text-secondary hover:text-primary">المراجعات</button>
+          </div>
+
+          <!-- Filters Row -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4">
+            <div class="md:col-span-3 relative">
+              <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary">search</span>
+              <input id="searchInput" type="text" placeholder="ابحث باسم الطالب، السورة، الحلقة…" class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-background focus:border-primary focus:ring-0" />
             </div>
-            <div class="flex items-center gap-2 text-text-secondary">
-                <span class="material-symbols-outlined text-base">people</span>
-                <span class="text-sm">{{ item.student_count }} طالب</span>
+            <div class="md:col-span-2">
+              <select id="halaqaFilter" class="w-full rounded-lg border border-background focus:border-primary">
+                <option value="">كل الحلقات</option>
+                <option>حلقة التجويد المتقدمة</option>
+                <option>حلقة حفظ الجزء الأخير</option>
+                <option>تفسير الآيات المختارة</option>
+              </select>
             </div>
-            <div class="flex items-center gap-2 mt-auto pt-4 border-t border-background">
-                <button class="bg-primary/10 text-primary w-full py-2 rounded-lg text-sm font-bold hover:bg-primary/20 transition-colors">عرض التفاصيل</button>
-                <button class="bg-secondary/20 text-secondary w-full py-2 rounded-lg text-sm font-bold hover:bg-secondary/30 transition-colors">إضافة مهمة</button>
+            <div class="md:col-span-2">
+              <select id="statusFilter" class="w-full rounded-lg border border-background focus:border-primary">
+                <option value="">كل الحالات</option>
+                <option value="pending">بانتظار التقييم</option>
+                <option value="scored">تم التقييم</option>
+                <option value="returned">أُعيد للتصحيح</option>
+              </select>
             </div>
-        </div>
-        {% empty %}
-        <div class="md:col-span-2 lg:col-span-3 bg-card p-6 rounded-xl shadow-subtle text-center text-text-secondary">
-            <p>لم يتم إسناد أي حلقات لك حتى الآن. يرجى مراجعة المشرف.</p>
-        </div>
-        {% endfor %}
+            <div class="md:col-span-2">
+              <input id="dateFrom" type="date" class="w-full rounded-lg border border-background focus:border-primary" />
+            </div>
+            <div class="md:col-span-2">
+              <input id="dateTo" type="date" class="w-full rounded-lg border border-background focus:border-primary" />
+            </div>
+            <div class="md:col-span-1">
+              <select id="sortBy" class="w-full rounded-lg border border-background focus:border-primary">
+                <option value="newest">الأحدث</option>
+                <option value="oldest">الأقدم</option>
+                <option value="score">الأعلى درجة</option>
+                <option value="duration">الأطول زمناً</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Bulk Actions -->
+          <div class="flex items-center gap-3 mt-4">
+            <label class="inline-flex items-center gap-2 text-sm text-text-secondary">
+              <input id="selectAll" type="checkbox" class="rounded border-background text-primary focus:ring-primary" />
+              تحديد الكل
+            </label>
+            <div class="flex items-center gap-2">
+              <button class="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20" id="bulkScoreBtn">
+                <span class="material-symbols-outlined align-[-4px] text-base">playlist_add_check</span>
+                تقييم جماعي
+              </button>
+              <button class="px-3 py-1.5 rounded-lg bg-secondary/10 text-secondary text-sm font-bold hover:bg-secondary/20" id="bulkReturnBtn">
+                <span class="material-symbols-outlined align-[-4px] text-base">undo</span>
+                إعادة للتصحيح
+              </button>
+              <button class="px-3 py-1.5 rounded-lg bg-background text-text-secondary text-sm font-bold hover:bg-background/80" id="exportCsvBtn">
+                <span class="material-symbols-outlined align-[-4px] text-base">download</span>
+                تصدير CSV
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Submissions Table/Card -->
+        <section class="bg-card rounded-xl shadow-subtle overflow-hidden">
+          <div class="hidden md:grid grid-cols-12 gap-4 px-6 py-3 text-xs text-text-secondary border-b border-background">
+            <div class="col-span-5 flex items-center gap-3">
+              <span class="w-5"><input type="checkbox" id="headCheckbox" class="rounded border-background text-primary focus:ring-primary" /></span>
+              <span>الطالب</span>
+            </div>
+            <div class="col-span-2">الحلقة</div>
+            <div class="col-span-1">النوع</div>
+            <div class="col-span-2">النطاق</div>
+            <div class="col-span-1">المدة</div>
+            <div class="col-span-1 text-left">التاريخ</div>
+          </div>
+
+          <div id="listContainer" class="divide-y divide-background"></div>
+
+          <!-- Pagination -->
+          <div class="flex items-center justify-between p-4">
+            <p class="text-sm text-text-secondary" id="countLabel">0 عنصر</p>
+            <div class="flex items-center gap-2">
+              <button id="prevPage" class="px-3 py-1.5 rounded-lg bg-background text-text-secondary text-sm hover:bg-background/80 disabled:opacity-50">السابق</button>
+              <span class="text-sm" id="pageLabel">1 / 1</span>
+              <button id="nextPage" class="px-3 py-1.5 rounded-lg bg-background text-text-secondary text-sm hover:bg-background/80 disabled:opacity-50">التالي</button>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
-{% endblock %}
+  </div>
 
+  <!-- View Drawer -->
+  <div id="viewDrawer" class="fixed inset-0 bg-black/40 hidden z-50">
+    <div class="absolute inset-y-0 left-0 w-full max-w-xl bg-card shadow-subtle p-6 overflow-y-auto">
+      <div class="flex items-start justify-between">
+        <div>
+          <h3 class="text-xl font-bold">تفاصيل التسليم</h3>
+          <p class="text-sm text-text-secondary mt-1" id="drawerSubtitle">—</p>
+        </div>
+        <button class="material-symbols-outlined text-text-secondary hover:text-primary" onclick="closeDrawer()">close</button>
+      </div>
 
-{% block extra_js %}
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-{% endblock %}
+      <div class="mt-6 space-y-6">
+        <div class="flex items-center gap-3">
+          <div id="drawerAvatar" class="size-12 rounded-full bg-cover bg-center"></div>
+          <div>
+            <p id="drawerName" class="font-bold">—</p>
+            <p id="drawerHalaqa" class="text-sm text-text-secondary">—</p>
+          </div>
+        </div>
+        <div>
+          <h4 class="font-bold mb-2">المحتوى</h4>
+          <div class="rounded-lg border border-background p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-text-secondary">نوع التسليم</p>
+                <p id="drawerType" class="font-bold">—</p>
+              </div>
+              <div>
+                <p class="text-sm text-text-secondary">النطاق</p>
+                <p id="drawerRange" class="font-bold">—</p>
+              </div>
+              <div>
+                <p class="text-sm text-text-secondary">المدة</p>
+                <p id="drawerDuration" class="font-bold">—</p>
+              </div>
+            </div>
+            <div class="mt-4">
+              <div class="aspect-video rounded-lg bg-background flex items-center justify-center">
+                <span class="material-symbols-outlined text-4xl text-text-secondary">play_circle</span>
+              </div>
+              <p class="text-xs text-text-secondary mt-2">مكان مخصص لمشغل الصوت/الفيديو (تصميم فقط).</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h4 class="font-bold mb-2">ملاحظات الطالب</h4>
+          <div id="drawerNotes" class="rounded-lg border border-background p-4 text-sm text-text-secondary">—</div>
+        </div>
+        <div>
+          <h4 class="font-bold mb-2">التقييم</h4>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-text-secondary">الدرجة</span>
+            <input id="drawerScore" type="number" min="0" max="100" class="w-20 rounded-lg border border-background" />
+            <button class="px-3 py-1.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-secondary" onclick="alert('تصميم فقط: تم حفظ الدرجة.')">حفظ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Dummy Data =====
+    const submissions = [
+      {
+        id: 1,
+        student: "أحمد منصور",
+        avatar: "https://i.pravatar.cc/100?img=12",
+        halaqa: "حلقة التجويد المتقدمة",
+        type: "recite", // recite | review
+        range: "من آية 1 إلى 20 - سورة الملك",
+        duration: 7,
+        date: "2025-09-24T16:10:00",
+        status: "pending", // pending | scored | returned
+        score: null,
+        notes: "حرصت على ضبط أحكام النون الساكنة."
+      },
+      {
+        id: 2,
+        student: "سارة الشمري",
+        avatar: "https://i.pravatar.cc/100?img=5",
+        halaqa: "حلقة حفظ الجزء الأخير",
+        type: "review",
+        range: "مراجعة جزء عمّ كامل",
+        duration: 15,
+        date: "2025-09-25T10:05:00",
+        status: "scored",
+        score: 92,
+        notes: "تحسن ملحوظ في الوقف والابتداء."
+      },
+      {
+        id: 3,
+        student: "ليان الحربي",
+        avatar: "https://i.pravatar.cc/100?img=32",
+        halaqa: "تفسير الآيات المختارة",
+        type: "review",
+        range: "تفسير الآيات 30-35 من سورة البقرة",
+        duration: 12,
+        date: "2025-09-22T09:30:00",
+        status: "returned",
+        score: 70,
+        notes: "يرجى إعادة التسجيل مع تحسين مخارج بعض الحروف."
+      },
+      {
+        id: 4,
+        student: "محمد زيدان",
+        avatar: "https://i.pravatar.cc/100?img=25",
+        halaqa: "حلقة التجويد المتقدمة",
+        type: "recite",
+        range: "الآيات 1-10 من سورة الرحمن",
+        duration: 5,
+        date: "2025-09-26T18:40:00",
+        status: "pending",
+        score: null,
+        notes: "—"
+      },
+      {
+        id: 5,
+        student: "ريم العتيبي",
+        avatar: "https://i.pravatar.cc/100?img=45",
+        halaqa: "حلقة حفظ الجزء الأخير",
+        type: "recite",
+        range: "سورة النبأ كاملة",
+        duration: 10,
+        date: "2025-09-20T15:00:00",
+        status: "scored",
+        score: 97,
+        notes: "إتقان ممتاز للتجويد."
+      },
+      {
+        id: 6,
+        student: "خالد بركات",
+        avatar: "https://i.pravatar.cc/100?img=18",
+        halaqa: "تفسير الآيات المختارة",
+        type: "review",
+        range: "مراجعة معاني الآيات 50-60 من آل عمران",
+        duration: 9,
+        date: "2025-09-19T11:20:00",
+        status: "pending",
+        score: null,
+        notes: "—"
+      }
+    ];
+
+    // ===== UI State =====
+    let state = {
+      tab: "all",
+      search: "",
+      halaqa: "",
+      status: "",
+      dateFrom: "",
+      dateTo: "",
+      sortBy: "newest",
+      page: 1,
+      pageSize: 6,
+      selected: new Set(),
+    };
+
+    // ===== Helpers =====
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+    const formatDate = (iso) => {
+      const d = new Date(iso);
+      const date = d.toLocaleDateString("ar-EG", { year: "numeric", month: "short", day: "numeric" });
+      const time = d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+      return `${date} • ${time}`;
+    };
+
+    const badge = (status) => {
+      const map = {
+        pending: { text: "بانتظار التقييم", cls: "bg-warning/10 text-warning" },
+        scored: { text: "تم التقييم", cls: "bg-success/10 text-success" },
+        returned: { text: "أُعيد للتصحيح", cls: "bg-danger/10 text-danger" },
+      };
+      const m = map[status] || map.pending;
+      return `<span class="px-2 py-1 rounded-full text-xs font-bold ${m.cls}">${m.text}</span>`;
+    };
+
+    const typeChip = (type) => {
+      return type === "recite"
+        ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary">تسميع</span>'
+        : '<span class="px-2 py-1 rounded-full text-xs font-bold bg-secondary/10 text-secondary">مراجعة</span>';
+    };
+
+    const paginate = (arr, page, pageSize) => arr.slice((page - 1) * pageSize, page * pageSize);
+
+    const applyFilters = () => {
+      let data = submissions.filter((s) => {
+        if (state.tab !== "all" && s.type !== state.tab) return false;
+        if (state.halaqa && s.halaqa !== state.halaqa) return false;
+        if (state.status && s.status !== state.status) return false;
+        if (state.search) {
+          const q = state.search.trim();
+          const hay = `${s.student} ${s.halaqa} ${s.range}`;
+          if (!hay.includes(q)) return false;
+        }
+        if (state.dateFrom && new Date(s.date) < new Date(state.dateFrom)) return false;
+        if (state.dateTo && new Date(s.date) > new Date(state.dateTo + "T23:59:59")) return false;
+        return true;
+      });
+
+      if (state.sortBy === "newest") data.sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (state.sortBy === "oldest") data.sort((a, b) => new Date(a.date) - new Date(b.date));
+      if (state.sortBy === "score") data.sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+      if (state.sortBy === "duration") data.sort((a, b) => b.duration - a.duration);
+
+      return data;
+    };
+
+    const renderList = () => {
+      const container = $("#listContainer");
+      const filtered = applyFilters();
+
+      const total = filtered.length;
+      const pages = Math.max(1, Math.ceil(total / state.pageSize));
+      if (state.page > pages) state.page = pages;
+      const pageData = paginate(filtered, state.page, state.pageSize);
+
+      $("#countLabel").textContent = `${total} عنصر`;
+      $("#pageLabel").textContent = `${state.page} / ${pages}`;
+      $("#prevPage").disabled = state.page === 1;
+      $("#nextPage").disabled = state.page === pages;
+
+      container.innerHTML = pageData
+        .map((s) => {
+          return `
+            <div class="submission-row grid grid-cols-1 md:grid-cols-12 gap-4 px-4 md:px-6 py-4">
+              <div class="md:col-span-5 flex items-center gap-3">
+                <input data-id="${s.id}" type="checkbox" class="row-check rounded border-background text-primary focus:ring-primary w-5 h-5" />
+                <div class="size-10 rounded-full bg-center bg-cover" style="background-image:url('${s.avatar}')"></div>
+                <div class="min-w-0">
+                  <p class="font-bold truncate">${s.student}</p>
+                  <div class="flex items-center gap-2 text-xs text-text-secondary mt-0.5">
+                    ${typeChip(s.type)}
+                    <span class="hidden md:inline">•</span>
+                    <span class="truncate">${s.range}</span>
+                  </div>
+                  <div class="mt-2 md:hidden flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-xs text-text-secondary">
+                      <span class="material-symbols-outlined text-base">schedule</span>
+                      <span>${s.duration} د</span>
+                    </div>
+                    <span class="text-xs">${formatDate(s.date)}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="md:col-span-2 hidden md:flex items-center">${s.halaqa}</div>
+              <div class="md:col-span-1 hidden md:flex items-center">${s.type === "recite" ? "تسميع" : "مراجعة"}</div>
+              <div class="md:col-span-2 hidden md:flex items-center">${s.range}</div>
+              <div class="md:col-span-1 hidden md:flex items-center">${s.duration} د</div>
+              <div class="md:col-span-1 hidden md:flex items-center justify-end">${formatDate(s.date)}</div>
+
+              <div class="md:col-span-12 flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0">
+                <div class="flex items-center gap-2">${badge(s.status)} ${s.score != null ? `<span class='text-xs text-text-secondary'>• درجة: <span class='font-bold'>${s.score}</span></span>` : ""}</div>
+                <div class="flex items-center gap-2">
+                  <button class="px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20" onclick='openDrawer(${JSON.stringify(s).replaceAll("'","&#39;")})'>عرض</button>
+                  <button class="px-3 py-1.5 rounded-lg bg-secondary/10 text-secondary text-sm font-bold hover:bg-secondary/20" onclick='openDrawer(${JSON.stringify(s).replaceAll("'","&#39;")}); setTimeout(()=>document.getElementById("drawerScore").focus(), 50)'>تقييم</button>
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      // Row checkbox bindings
+      $$(".row-check").forEach((cb) => {
+        cb.addEventListener("change", (e) => {
+          const id = Number(e.target.getAttribute("data-id"));
+          if (e.target.checked) state.selected.add(id); else state.selected.delete(id);
+        });
+      });
+    };
+
+    // ===== Drawer =====
+    function openDrawer(s) {
+      $("#drawerSubtitle").textContent = formatDate(s.date);
+      $("#drawerAvatar").style.backgroundImage = `url(${s.avatar})`;
+      $("#drawerName").textContent = s.student;
+      $("#drawerHalaqa").textContent = s.halaqa;
+      $("#drawerType").textContent = s.type === 'recite' ? 'تسميع' : 'مراجعة';
+      $("#drawerRange").textContent = s.range;
+      $("#drawerDuration").textContent = `${s.duration} دقيقة`;
+      $("#drawerNotes").textContent = s.notes || '—';
+      $("#drawerScore").value = s.score ?? '';
+      $("#viewDrawer").classList.remove("hidden");
+    }
+    function closeDrawer(){ $("#viewDrawer").classList.add("hidden"); }
+
+    // ===== Events =====
+    $$(".tab-btn").forEach((btn) => btn.addEventListener("click", (e) => {
+      $$(".tab-btn").forEach(b => b.classList.remove("bg-primary/10","text-primary"));
+      e.currentTarget.classList.add("bg-primary/10","text-primary");
+      state.tab = e.currentTarget.dataset.tab;
+      state.page = 1; renderList();
+    }));
+
+    ["searchInput","halaqaFilter","statusFilter","dateFrom","dateTo","sortBy"].forEach(id => {
+      const el = document.getElementById(id);
+      el && el.addEventListener("input", () => {
+        state[id.replace("Filter",""))] = el.value; // quick map for halaqa/status
+      });
+      el && el.addEventListener("change", () => {
+        if(id==="searchInput") state.search = el.value; 
+        if(id==="halaqaFilter") state.halaqa = el.value; 
+        if(id==="statusFilter") state.status = el.value; 
+        if(id==="dateFrom") state.dateFrom = el.value; 
+        if(id==="dateTo") state.dateTo = el.value; 
+        if(id==="sortBy") state.sortBy = el.value; 
+        state.page = 1; renderList();
+      });
+    });
+
+    $("#prevPage").addEventListener("click", ()=>{ if(state.page>1){ state.page--; renderList(); }});
+    $("#nextPage").addEventListener("click", ()=>{ state.page++; renderList(); });
+
+    $("#selectAll").addEventListener("change", (e) => {
+      const filtered = applyFilters();
+      if (e.target.checked) { state.selected = new Set(filtered.map(s=>s.id)); }
+      else { state.selected.clear(); }
+      renderList();
+    });
+
+    $("#bulkScoreBtn").addEventListener("click", ()=>{
+      alert(`تصميم فقط: سيتم فتح تقييم جماعي لعدد ${state.selected.size} عنصر.`);
+    });
+
+    $("#bulkReturnBtn").addEventListener("click", ()=>{
+      alert(`تصميم فقط: تمت إعادة ${state.selected.size} عنصر للتصحيح.`);
+    });
+
+    $("#exportCsvBtn").addEventListener("click", ()=>{
+      const rows = [
+        ["الطالب","الحلقة","النوع","النطاق","المدة(د)","التاريخ","الحالة","الدرجة"],
+        ...applyFilters().map(s=>[s.student,s.halaqa,s.type==='recite'?'تسميع':'مراجعة',s.range,s.duration,new Date(s.date).toISOString(),s.status,s.score??''])
+      ];
+      const csv = rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'submissions.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Dark mode toggle (UI only)
+    $("#toggleDark").addEventListener("click", () => {
+      document.documentElement.classList.toggle("dark");
+      document.body.classList.toggle("bg-background");
+      document.body.classList.toggle("bg-zinc-900");
+      document.body.classList.toggle("text-white");
+    });
+
+    // Initial render
+    renderList();
+  </script>
+</body>
+</html>

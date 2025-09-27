@@ -992,3 +992,113 @@ def send_halaqa_notification(request, halaqa_id):
         return JsonResponse({'status': 'error', 'message': 'الحلقة المطلوبة غير موجودة.'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': 'حدث خطأ غير متوقع في الخادم.'}, status=500)
+        
+
+
+@login_required
+def get_submission_details(request, submission_id):
+    """
+    API لجلب بيانات تسليم معين بصيغة JSON.
+    """
+    # تأكد أن المعلم له صلاحية على هذا التسليم
+    submission = get_object_or_404(
+        RecitationSubmission.objects.select_related('student__user', 'recitation'),
+        pk=submission_id,
+        recitation__halaqa__teachers=request.user.profile
+    )
+
+    data = {
+        'student_name': submission.student.user.username,
+        'avatar_url': submission.student.avatar_url,
+        'recitation_title': str(submission.recitation),
+        'deadline': submission.recitation.deadline.strftime('%Y-%m-%d %H:%M') if submission.recitation.deadline else 'غير محدد',
+        'submitted_at': submission.created_at.strftime('%Y-%m-%d %H:%M'),
+        'audio_url': submission.audio.url if submission.audio else '',
+        'current_notes': submission.notes or '',
+        'current_hifdh': submission.hifdh or 5,
+        'current_rules': submission.rules or 5,
+    }
+    return JsonResponse(data)
+
+
+
+
+@require_POST
+@login_required
+@transaction.atomic
+def grade_submission(request, submission_id):
+    """
+    حفظ التقييم القادم من نافذة التقييم + إرجاع إحصائيات محدثة
+    متطابقة مع teacher_dashboard.
+    """
+    submission = get_object_or_404(
+        RecitationSubmission,
+        pk=submission_id,
+        recitation__halaqa__teachers=request.user.profile
+    )
+
+    # قراءة بيانات JSON
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "صيغة البيانات غير صالحة."}, status=400)
+
+    try:
+        hifdh = float(data.get("hifdh", 0))
+        rules = float(data.get("rules", 0))
+        notes = (data.get("notes") or "").strip()
+    except (TypeError, ValueError):
+        return JsonResponse({"status": "error", "message": "قيم التقييم غير صالحة."}, status=400)
+
+    # تحقق من الحدود (0..5)
+    if not (0 <= hifdh <= 5) or not (0 <= rules <= 5):
+        return JsonResponse({"status": "error", "message": "قيم التقييم يجب أن تكون بين 0 و 5."}, status=400)
+
+    # الدرجة الإجمالية من 10
+    total_score = hifdh + rules
+
+    # حفظ التقييم
+    submission.hifdh = hifdh
+    submission.rules = rules
+    submission.score = total_score
+    submission.notes = notes
+    submission.status = "graded"
+    submission.save()
+
+    # ===== إحصائيات محدثة (بنفس منطق لوحة المعلم) =====
+    teacher = request.user.profile
+    my_halaqat = Halaqa.objects.filter(teachers=teacher)  # نفس التجميعة المستخدمة في اللوحة
+
+    # 1) تسليمات قيد التصحيح (لاحظ: الحالة 'submitted' وليست 'pending')
+    pending_submissions_count = RecitationSubmission.objects.filter(
+        recitation__halaqa__in=my_halaqat,
+        status='submitted'
+    ).count()
+
+    # 2) إجمالي الطلاب في حلقات المعلم
+    total_students_count = Profile.objects.filter(
+        halaqa__in=my_halaqat,
+        role=Profile.ROLE_STUDENT
+    ).count()
+
+    # 3) عدد الحلقات النشطة (لو عندك is_active استخدمه، وإلا استخدم العدد الكلي)
+    # في teacher_dashboard أنت بتحسب count() مباشرة بدون فلتر is_active
+    active_halaqat_count = my_halaqat.count()
+
+    # 4) متوسط الأداء (من التسميعات المصححة فقط) ثم ×10 ليصبح نسبة مئوية
+    avg_performance_rec = RecitationSubmission.objects.filter(
+        recitation__halaqa__in=my_halaqat,
+        status='graded'
+    ).aggregate(avg_score=Avg('score'))['avg_score'] or 0
+    average_performance = round(avg_performance_rec * 10, 1) if avg_performance_rec else 0
+
+    return JsonResponse({
+        "status": "success",
+        "message": "تم حفظ التقييم بنجاح!",
+        "stats": {
+            "pending_submissions_count": pending_submissions_count,
+            "total_students_count": total_students_count,
+            "active_halaqat_count": active_halaqat_count,
+            "average_performance": average_performance,
+        }
+    })

@@ -40,4 +40,8 @@ urlpatterns = [
     path('halaqa/<int:halaqa_id>/send-notification/', views.send_halaqa_notification, name='send_halaqa_notification'),
 
 
+    path('api/submission/<int:submission_id>/', views.get_submission_details, name='get_submission_details'),
+    path('teacher/submission/<int:submission_id>/grade/', views.grade_submission, name='grade_submission'),
+
+
 ]
