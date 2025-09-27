@@ -1,0 +1,432 @@
+{% extends "teacher_base.html" %}
+{% load static custom_filters %}
+
+{% block title %}تفاصيل حلقة: {{ halaqa.name }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-y-4 mb-8">
+    <div class="flex items-center gap-4">
+        <a href="javascript:history.back()" class="text-text-secondary hover:text-primary transition-colors p-2 rounded-full -mr-2" title="العودة للخلف">
+            <span class="material-symbols-outlined text-4xl transform scale-x-[-1]">arrow_forward_ios</span>
+        </a>
+        <div>
+            <h1 class="text-3xl font-bold text-text-primary">{{ halaqa.name }}</h1>
+            <p class="text-text-secondary mt-1">مركز التحكم الكامل للحلقة.</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <button class="js-send-notification-btn bg-primary/10 text-primary flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors">
+            <span class="material-symbols-outlined">campaign</span>
+            <span>إرسال إشعار</span>
+        </button>
+        <button class="js-add-halaqa-task bg-primary text-white flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-secondary transition-colors" data-halaqa-id="{{ halaqa.id }}" data-halaqa-name="{{ halaqa.name }}">
+            <span class="material-symbols-outlined">add_task</span>
+            <span>إضافة مهمة</span>
+        </button>
+    </div>
+</div>
+
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+    <div class="bg-card p-6 rounded-lg shadow-subtle hover:shadow-lifted hover:-translate-y-1 transition-all duration-300">
+        <p class="text-sm text-text-secondary">إجمالي الطلاب</p>
+        <p class="text-4xl font-bold text-text-primary mt-2">{{ student_count }}</p>
+    </div>
+    <div class="bg-card p-6 rounded-lg shadow-subtle hover:shadow-lifted hover:-translate-y-1 transition-all duration-300">
+        <p class="text-sm text-text-secondary">متوسط الأداء العام</p>
+        <p class="text-4xl font-bold text-secondary mt-2">{{ avg_performance }}%</p>
+    </div>
+    <div class="bg-card p-6 rounded-lg shadow-subtle hover:shadow-lifted hover:-translate-y-1 transition-all duration-300">
+        <p class="text-sm text-text-secondary">تسليمات قيد التصحيح</p>
+        <p class="text-4xl font-bold text-text-primary mt-2">{{ pending_submissions_halaqa }}</p>
+    </div>
+
+</section>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <section class="lg:col-span-2">
+        <h2 class="text-xl font-bold text-text-primary mb-4">قائمة طلاب الحلقة</h2>
+        <div class="bg-card rounded-lg shadow-subtle overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-right">
+                    <thead>
+                        <tr class="border-b border-border-color bg-gray-50">
+                            <th class="p-4 font-bold text-text-primary">اسم الطالب</th>
+                            <th class="p-4 font-bold text-text-primary text-center">تسليمات متأخرة</th>
+                            <th class="p-4 font-bold text-text-primary text-center">متوسط الأداء</th>
+                            <th class="p-4 font-bold text-text-primary">إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students_list %}
+                        <tr class="border-b border-border-color last:border-b-0 hover:bg-background">
+                            <td class="p-4 align-middle">
+                                <div class="flex items-center gap-3">
+                                    <img alt="Avatar" class="w-10 h-10 rounded-full object-cover" src="{{ student.avatar_url }}"/>
+                                    <span class="font-bold text-text-primary">{{ student.user.username }}</span>
+                                </div>
+                            </td>
+                            <td class="p-4 text-center align-middle">
+                                <span class="font-bold text-lg {% if student.late_submissions_count > 0 %}text-red-500{% else %}text-text-secondary{% endif %}">
+                                    {{ student.late_submissions_count }}
+                                </span>
+                            </td>
+                            <td class="p-4 text-center align-middle">
+                                <span class="font-bold text-lg text-secondary">
+                                    {% if student.avg_score is not None %}{{ student.avg_score|floatformat:1 }}<span class="text-sm text-text-secondary">/10</span>{% else %}-{% endif %}
+                                </span>
+                            </td>
+                            <td class="p-4 align-middle">
+                                <div class="flex gap-1">
+                                    <button class="js-view-profile text-text-secondary p-2 rounded-lg hover:bg-gray-200 hover:text-primary transition-colors" title="عرض الملف الشخصي"
+                                            data-name="{{ student.user.username }}"
+                                            data-avatar="{{ student.avatar_url }}"
+                                            data-halaqa="{{ student.halaqa.name }}"
+                                            data-joined="{{ student.user.date_joined|date:'d M Y' }}"
+                                            data-phone="{{ student.guardian_phone|default:'غير مسجل' }}"
+                                            data-age="{% if student.birth_date %}{{ student.birth_date|timesince|slice:':2' }} سنوات{% else %}غير مسجل{% endif %}">
+                                        <span class="material-symbols-outlined">visibility</span>
+                                    </button>
+                                    <button class="js-add-student-task text-text-secondary p-2 rounded-lg hover:bg-gray-200 hover:text-primary transition-colors" title="إضافة مهمة لهذا الطالب"
+                                            data-student-id="{{ student.id }}"
+                                            data-student-name="{{ student.user.username }}"
+                                            data-halaqa-id="{{ halaqa.id }}"
+                                            data-halaqa-name="{{ halaqa.name }}">
+                                        <span class="material-symbols-outlined">add_task</span>
+                                    </button>
+                                    <button class="js-delete-student text-text-secondary p-2 rounded-lg hover:bg-gray-200 hover:text-red-600 transition-colors" title="حذف الطالب من الحلقة"
+                                            data-student-id="{{ student.id }}"
+                                            data-student-name="{{ student.user.username }}">
+                                        <span class="material-symbols-outlined">delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="p-5 text-center text-text-secondary">لا يوجد طلاب في هذه الحلقة حاليًا.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="lg:col-span-1">
+        <h2 class="text-xl font-bold text-text-primary mb-4">سجل المهام الأخير</h2>
+        <div class="space-y-3">
+            {% for task in recent_tasks %}
+            <div class="bg-card p-4 rounded-lg shadow-subtle">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-bold text-primary">{{ task.type }}</p>
+                        <p class="text-sm font-bold text-text-primary mt-1">{{ task.surah }}{% if task.start_ayah %}: {{ task.start_ayah }} - {{ task.end_ayah }}{% endif %}</p>
+                    </div>
+                    {% if task.type == 'تسميع' %}
+                        <span class="material-symbols-outlined text-primary/50">hearing</span>
+                    {% else %}
+                        <span class="material-symbols-outlined text-primary/50">history</span>
+                    {% endif %}
+                </div>
+                <div class="text-xs text-text-secondary mt-3 pt-2 border-t border-gray-100">
+                    أضافها: {{ task.created_by.user.username }} | {{ task.created_at|arabic_timesince }}
+                </div>
+            </div>
+            {% empty %}
+            <p class="bg-card p-4 rounded-lg shadow-subtle text-center text-text-secondary">لا توجد مهام مسندة مؤخرًا.</p>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+
+{% include "teachers/_task_form_modal.html" %}
+
+<div class="modal fixed inset-0 z-50 p-4" id="studentProfileModal">
+    <div class="modal-overlay fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm js-close-modal"></div>
+    <div class="w-full h-full flex items-center justify-center">
+        <div class="modal-content relative bg-card rounded-lg shadow-2xl w-full max-w-2xl">
+            <button class="absolute top-4 left-4 text-text-secondary hover:text-text-primary transition-colors js-close-modal" title="إغلاق">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <div class="p-8">
+                <div class="flex flex-col items-center text-center">
+                    <img id="modal-profile-avatar" alt="Student Avatar" class="w-24 h-24 rounded-full mb-4 ring-4 ring-primary/20 object-cover" src=""/>
+                    <h2 id="modal-profile-name" class="text-3xl font-bold text-text-primary"></h2>
+                    <p id="modal-profile-halaqa" class="text-text-secondary text-lg"></p>
+                </div>
+                <div class="border-t border-border-color my-6"></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 text-center md:text-right">
+                    <div>
+                        <p class="text-sm text-text-secondary">رقم ولي الأمر</p>
+                        <p id="modal-profile-phone" class="font-bold text-text-primary"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-text-secondary">تاريخ الانضمام</p>
+                        <p id="modal-profile-joined" class="font-bold text-text-primary"></p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-text-secondary">السن</p>
+                        <p id="modal-profile-age" class="font-bold text-text-primary"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fixed inset-0 z-50 p-4" id="sendNotificationModal">
+    <div class="modal-overlay fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm js-close-modal"></div>
+    <div class="w-full h-full flex items-center justify-center">
+        <div class="modal-content relative bg-card rounded-lg shadow-2xl w-full max-w-lg">
+            <form id="sendNotificationForm" action="{% url 'accounts:send_halaqa_notification' halaqa.id %}" method="POST">
+                {% csrf_token %}
+                <div class="p-8">
+                    <h2 class="text-2xl font-bold text-text-primary mb-2">إرسال إشعار للحلقة</h2>
+                    <p class="text-text-secondary mb-6">سيتم إرسال هذا الإشعار إلى جميع طلاب حلقة <span class="font-bold text-primary">{{ halaqa.name }}</span>.</p>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="notification_title" class="block text-sm font-medium text-text-primary mb-1">عنوان الإشعار (اختياري)</label>
+                            <input type="text" name="title" id="notification_title" placeholder="مثال: تذكير هام" class="w-full bg-background border border-gray-200 rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary placeholder-text-secondary transition-colors"/>
+                        </div>
+                        <div>
+                            <label for="notification_message" class="block text-sm font-medium text-text-primary mb-1">محتوى الرسالة</label>
+                            <textarea name="message" id="notification_message" required rows="4" placeholder="اكتب رسالتك هنا..." class="w-full bg-background border border-gray-200 rounded-lg py-2.5 px-4 focus:ring-primary focus:border-primary placeholder-text-secondary transition-colors"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-background px-8 py-4 flex justify-end gap-3 rounded-b-lg border-t border-gray-100">
+                    <button type="button" class="js-close-modal bg-gray-200 text-text-secondary px-6 py-2.5 rounded-lg font-bold hover:bg-gray-300 transition-colors">إلغاء</button>
+                    <button type="submit" class="bg-primary text-white flex items-center gap-2 px-6 py-2.5 rounded-lg font-bold hover:bg-secondary transition-colors">
+                        <span class="material-symbols-outlined">send</span>
+                        <span>إرسال</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    
+    // ========== بداية: كود جديد لتفعيل نافذة الإشعارات ==========
+    // تم وضعه في الأعلى لضمان عدم تعارضه مع أي شيء
+    const sendNotificationModal = document.getElementById('sendNotificationModal');
+    const sendNotificationForm = document.getElementById('sendNotificationForm');
+
+    // 1. فتح النافذة عند الضغط على الزر
+    document.querySelector('.js-send-notification-btn')?.addEventListener('click', (e) => {
+        e.preventDefault(); 
+        if (sendNotificationModal) {
+            openModal(sendNotificationModal); // استخدام الدالة العامة من teacher_base.html
+        }
+    });
+
+    // 2. إرسال بيانات النموذج باستخدام AJAX
+    sendNotificationForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const url = form.action;
+        const data = Object.fromEntries(new FormData(form).entries());
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify(data),
+            });
+            const result = await response.json();
+            
+            if (response.ok) {
+                closeModal(); // استخدام الدالة العامة من teacher_base.html
+                showSuccess(result.message || 'تم إرسال الإشعار بنجاح!');
+            } else {
+                showError(result.message || 'فشل إرسال الإشعار.');
+            }
+        } catch (error) {
+            console.error('Error sending notification:', error);
+            showError('حدث خطأ في الشبكة. يرجى المحاولة مرة أخرى.');
+        }
+    });
+    // ========== نهاية: الكود الجديد ==========
+
+
+    // ==========================================================
+    // == الكود الأصلي الخاص بك كما هو بالضبط دون أي تغيير ==
+    // ==========================================================
+    const addTaskModal = document.getElementById('addTaskModal');
+    const profileModal = document.getElementById('studentProfileModal');
+
+    if (!addTaskModal) {
+        console.error('Modal #addTaskModal غير موجود في الصفحة.');
+        return;
+    }
+    
+    const getCsrf = () => {
+        const el = document.querySelector('[name=csrfmiddlewaretoken]');
+        return el ? el.value : '';
+    };
+
+    const showSuccess = (msg) => Swal.fire('تم', msg || 'تمت العملية بنجاح.', 'success');
+    const showError   = (msg) => Swal.fire('خطأ', msg || 'حدث خطأ غير متوقع.', 'error');
+
+    document.querySelectorAll('.js-add-halaqa-task').forEach(btn => {
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+            const halaqaId = btn.dataset.halaqaId;
+            const halaqaName = btn.dataset.halaqaName;
+
+            const form = addTaskModal.querySelector('form'); // #addHalaqaTaskForm
+            form.action = "{% url 'accounts:add_halaqa_task' %}";   // إضافة مهمة للحلقة
+            addTaskModal.querySelector('#modal-halaqa-name').textContent = halaqaName;
+
+            // تعبئة الحقول المخفية
+            addTaskModal.querySelector('#task-halaqa-id').value = halaqaId;
+            addTaskModal.querySelector('#task-student-id').value = '';
+
+            // تحميل السور وفتح المودال
+            loadSurahsForHalaqa(halaqaId, addTaskModal);
+            openModal(addTaskModal);
+        });
+    });
+
+    document.querySelectorAll('.js-add-student-task').forEach(btn => {
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+            const studentId   = btn.dataset.studentId;
+            const studentName= btn.dataset.studentName;
+            const halaqaId    = btn.dataset.halaqaId;
+
+            const form = addTaskModal.querySelector('form');
+            form.action = "{% url 'accounts:add_student_task' %}";  // إضافة مهمة لطالب واحد
+            addTaskModal.querySelector('#modal-halaqa-name').textContent = `مهمة لـ: ${studentName}`;
+
+            // تعبئة الحقول المخفية
+            addTaskModal.querySelector('#task-halaqa-id').value = halaqaId;
+            addTaskModal.querySelector('#task-student-id').value = studentId;
+
+            loadSurahsForHalaqa(halaqaId, addTaskModal);
+            openModal(addTaskModal);
+        });
+    });
+
+    document.querySelectorAll('.js-view-profile').forEach(btn => {
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+            if (!profileModal) return;
+            const data = btn.dataset;
+            profileModal.querySelector('#modal-profile-avatar').src        = data.avatar || '';
+            profileModal.querySelector('#modal-profile-name').textContent  = data.name || '';
+            profileModal.querySelector('#modal-profile-halaqa').textContent= data.halaqa || '';
+            profileModal.querySelector('#modal-profile-phone').textContent = data.phone || '';
+            profileModal.querySelector('#modal-profile-joined').textContent= data.joined || '';
+            profileModal.querySelector('#modal-profile-age').textContent   = data.age || '';
+            openModal(profileModal);
+        });
+    });
+
+    document.querySelectorAll('.js-delete-student').forEach(btn => {
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+            const studentId   = btn.dataset.studentId;
+            const studentName = btn.dataset.studentName;
+            const url = `/student/${studentId}/unassign/`;
+
+            Swal.fire({
+                title: 'هل أنت متأكد؟',
+                text: `سيتم إزالة الطالب (${studentName}) من هذه الحلقة. لن يتم حذف الطالب نهائيًا.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#386641',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'نعم، قم بالإزالة',
+                cancelButtonText: 'إلغاء'
+            }).then(async (result) => {
+                if (!result.isConfirmed) return;
+                try {
+                    const resp = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCsrf() }
+                    });
+                    const data = await resp.json();
+                    if (data.status === 'success') {
+                        const row = btn.closest('tr');
+                        if (row) {
+                            row.style.transition = 'opacity 0.5s ease';
+                            row.style.opacity = '0';
+                            setTimeout(() => row.remove(), 500);
+                        }
+                        showSuccess('تمت إزالة الطالب من الحلقة.');
+                    } else {
+                        showError(data.message);
+                    }
+                } catch (_) {
+                    showError('حدث خطأ في الشبكة.');
+                }
+            });
+        });
+    });
+
+    const typeInput = document.getElementById('task-type-input');
+    const recBtn    = document.getElementById('recitation-btn');
+    const revBtn    = document.getElementById('review-btn');
+
+    if (recBtn && revBtn && typeInput) {
+        const activate = (isRecitation) => {
+            typeInput.value = isRecitation ? 'recitation' : 'review';
+            recBtn.classList.toggle('bg-white', isRecitation);
+            recBtn.classList.toggle('text-primary', isRecitation);
+            recBtn.classList.toggle('shadow-sm', isRecitation);
+            recBtn.classList.toggle('text-text-secondary', !isRecitation);
+
+            revBtn.classList.toggle('bg-white', !isRecitation);
+            revBtn.classList.toggle('text-primary', !isRecitation);
+            revBtn.classList.toggle('shadow-sm', !isRecitation);
+            revBtn.classList.toggle('text-text-secondary', isRecitation);
+        };
+        recBtn.addEventListener('click', () => activate(true));
+        revBtn.addEventListener('click', () => activate(false));
+    }
+
+    (function bindAjaxSubmit() {
+        const form = addTaskModal.querySelector('form'); // #addHalaqaTaskForm
+        if (!form) return;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const body = new FormData(form);
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCsrf() },
+                    body
+                });
+
+                const contentType = resp.headers.get('Content-Type') || '';
+                if (!contentType.includes('application/json')) {
+                    closeModal();
+                    return location.reload();
+                }
+
+                const data = await resp.json();
+                if (data.status === 'success') {
+                    closeModal();
+                    await showSuccess(data.message || 'تم إضافة المهمة بنجاح.');
+                    location.reload();
+                } else {
+                    showError(data.message || 'تعذّر إضافة المهمة.');
+                }
+            } catch (err) {
+                showError('حدث خطأ في الشبكة.');
+            }
+        });
+    })();
+
+});
+</script>
+{% endblock %}

@@ -142,6 +142,9 @@ class Recitation(models.Model):
     end_ayah = models.PositiveIntegerField("إلى آية", blank=True, null=True)
     deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
 
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
         ordering = ["-id"]
 
@@ -202,6 +205,9 @@ class Review(models.Model):
     deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
     # --- نهاية التعديلات (تم حذف range_text) ---
 
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
         ordering = ["-id"]
 
@@ -253,3 +259,15 @@ class Attendance(models.Model):
     class Meta:
         unique_together = ("student","date")
         ordering = ["-date"]
+
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="notifications") # المستلم
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False) # لمعرفة هل قرأه الطالب أم لا
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"إشعار لـ {self.recipient.user.username}"

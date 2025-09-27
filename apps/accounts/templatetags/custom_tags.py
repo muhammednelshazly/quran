@@ -19,3 +19,17 @@ def arabic_day(value):
         return DAY_MAP.get(day_name, day_name)
     except Exception:
         return value
+
+
+# في ملف: apps/accounts/templatetags/custom_tags.py
+
+
+# ... (الفلتر القديم arabic_day يبقى كما هو) ...
+
+@register.filter
+def sub(value, arg):
+    """فلتر يقوم بطرح قيمة من أخرى"""
+    try:
+        return int(value) - int(arg)
+    except (ValueError, TypeError):
+        return value

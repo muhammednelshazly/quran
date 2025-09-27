@@ -1,5 +1,4 @@
 # apps/accounts/views.py
-
 from datetime import datetime, timedelta, date
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
@@ -10,7 +9,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
 from django.utils import timezone
-
+from django.db.models import Q, Count, Avg, Max
+from itertools import chain
+from operator import attrgetter
+from django.db.models import Q, Count, Avg, Max, F, Subquery, OuterRef
 try:
     from hijri_converter import Gregorian as _Gregorian
     HIJRI_OK = True
@@ -24,7 +26,8 @@ from apps.accounts.models import (
     RecitationSubmission,
     Attendance,
     Profile, Halaqa,
-    Review, ReviewSubmission
+    Review, ReviewSubmission,
+    Surah
 )
 
 # ========= أدوات مساعدة =========
@@ -34,54 +37,34 @@ AR_HIJRI_MONTHS = [
     "رمضان", "شوال", "ذو القعدة", "ذو الحجة",
 ]
 
-# ==========================================================
-#                  --- بداية التعديلات ---
-# ==========================================================
 
 def landing_page(request):
-    """
-    الصفحة الرئيسية (Landing Page).
-    # تعديل: إذا كان المستخدم مسجلاً دخوله (وليس مشرفًا)، يتم تحويله مباشرةً
-    # إلى بوابة التوجيه go التي سترسله إلى لوحة التحكم المناسبة.
-    # المشرف (Admin) سيتمكن من رؤية الصفحة الرئيسية بشكل طبيعي.
-    """
-    if request.user.is_authenticated and not request.user.is_staff:
-        return redirect('go')
-    
-    # إذا كان المستخدم زائرًا أو مشرفًا، اعرض له الصفحة الرئيسية
+    # لو عايز تحويل تلقائي لداشبورد المسجلين:
+    # if request.user.is_authenticated: return redirect('go')
     return render(request, 'landing_page.html')
 
 
 def go(request):
     """
     بوابة التوجيه من أزرار الصفحة الرئيسية.
-    تقوم بتوجيه كل مستخدم إلى لوحة التحكم الخاصة به.
     """
     user = request.user
 
-    # تعديل: أضفنا التحقق من المشرف (Admin) كأول خطوة
-    # إذا كان المستخدم مشرفًا أو أدمن، وجهه إلى لوحة تحكم الأدمن الرئيسية.
-    if user.is_staff or user.is_superuser:
-        return redirect('admin:index')
-
-    # باقي المنطق يبقى كما هو للطلاب والمعلمين
+    # لو الدور موجود كـ attribute أو في profile
     role = getattr(user, 'role', None)
     if role is None and hasattr(user, 'profile'):
         role = getattr(user.profile, 'role', None)
 
+    # لو الطالب
     if role == 'student' or user.groups.filter(name__iexact='student').exists():
-        return redirect('accounts:student_dashboard')
+        return HttpResponseRedirect('/dashboard/')
 
+    # لو المعلّم
     if role == 'teacher' or user.groups.filter(name__iexact='teacher').exists():
-        return redirect('accounts:teacher_dashboard')
+        return HttpResponseRedirect('/teacher/dashboard/')
 
-    # إذا كان المستخدم مسجلاً ولكن ليس له دور (أو أي مشكلة أخرى)،
-    # رجّعه إلى صفحة تسجيل الدخول.
-    return redirect('accounts:login')
-
-# ==========================================================
-#                  --- نهاية التعديلات ---
-# ==========================================================
+    # لو مفيش دور أو أي مشكلة → رجّعه على اللوجين
+    return HttpResponseRedirect('/login/')
 
 
 def home_view(request):
@@ -101,6 +84,7 @@ def login_view(request):
             messages.error(request, "من فضلك أكمل كل الحقول واختر نوع الحساب (طالب/معلم).")
             return render(request, "accounts/login.html", {"selected_role": role})
 
+        # السماح بتسجيل الدخول عبر البريد أو اسم المستخدم
         username = identifier
         if "@" in identifier:
             user_obj = User.objects.filter(email__iexact=identifier).first()
@@ -111,25 +95,28 @@ def login_view(request):
             messages.error(request, "بيانات الدخول غير صحيحة.")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # تم نقل منطق توجيه الأدمن إلى دالة go ليكون مركزيًا
+        # الإدمن يروح للوحة /admin
         if user.is_staff or user.is_superuser:
-            login(request, user) # يجب تسجيل الدخول أولاً
             return redirect("/admin/")
 
+        # تأكيد البروفايل
         if not hasattr(user, "profile"):
             Profile.objects.create(user=user)
 
+        # نوع الحساب لازم يطابق الاختيار
         if user.profile.role != role:
             messages.error(request, "نوع الحساب لا يطابق الاختيار (طالب/معلم).")
             return render(request, "accounts/login.html", {"selected_role": role})
 
+        # معلم غير معتمد؟
         if role == Profile.ROLE_TEACHER and user.profile.teacher_status != Profile.TEACHER_APPROVED:
             messages.error(request, "حساب المعلم قيد المراجعة من المشرف. سيتم إشعارك عند الاعتماد.")
             return render(request, "accounts/login.html", {"selected_role": role})
 
         login(request, user)
+        # الجلسة: 0 = تُغلق بخروج المتصفح، أو 14 يوم لو Remember me
         request.session.set_expiry(0 if not remember_me else 14 * 24 * 3600)
-        messages.success(request, "تم تسجيل الدخول بنجاح.")
+        # messages.success(request, "تم تسجيل الدخول بنجاح.")
         if user.profile.role == Profile.ROLE_STUDENT:
             return redirect("accounts:student_dashboard")
         elif user.profile.role == Profile.ROLE_TEACHER:
@@ -206,6 +193,7 @@ def register_view(request):
                 messages.error(request, "صيغة تاريخ الميلاد غير صحيحة.")
                 return render(request, "accounts/register.html", ctx({"selected_role": role}))
 
+            # لازم يختار حلقة صحيحة
             halaqa_obj = None
             if halaqa_input:
                 if str(halaqa_input).isdigit():
@@ -216,7 +204,7 @@ def register_view(request):
                 messages.error(request, "من فضلك اختر حلقة صحيحة من القائمة.")
                 return render(request, "accounts/register.html", ctx({"selected_role": role}))
         else:
-            halaqa_obj = None
+            halaqa_obj = None  # المعلم لا يُربط بحلقة هنا
 
         # 4) إنشاء المستخدم + البروفايل
         try:
@@ -235,8 +223,10 @@ def register_view(request):
                     if getattr(profile, "certificate", None):
                         profile.certificate.delete(save=False)
                     profile.certificate = None
+                    # الطالب دائمًا Approved
                     profile.teacher_status = Profile.TEACHER_APPROVED
                 else:
+                    # المعلّم Pending لحين اعتماد المشرف
                     profile.teacher_status = Profile.TEACHER_PENDING
                     profile.institution = institution
                     profile.bio = bio
@@ -264,17 +254,23 @@ def register_view(request):
             messages.success(request, "تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.")
         return redirect("accounts:login")
 
+    # GET
     return render(request, "accounts/register.html", {"halaqas": Halaqa.objects.all().order_by("name")})
 
 
 # ========= لوحات التحكم =========
 
 def start_of_sat_week(d):
+    # Mon=0..Sun=6  → Saturday=5
     delta = (d.weekday() - 5) % 7
     return d - timedelta(days=delta)
 
 
 def _range_len(obj):
+    """
+    يعيد عدد الآيات للمهمة (Recitation/Review) لو عندك start_ayah/end_ayah.
+    لو غير موجودين، يرجّع 0 (أو تقدر تعمل fallback لحقل آخر لو موجود).
+    """
     try:
         s = int(getattr(obj, "start_ayah", 0) or 0)
         e = int(getattr(obj, "end_ayah", 0) or 0)
@@ -283,13 +279,17 @@ def _range_len(obj):
         return 0
 
 
+
+
+
+
+
+
+
+# في ملف: apps/accounts/views.py
+
 @login_required(login_url="accounts:login")
 def student_dashboard(request):
-    # تعديل: أضفنا هذا الشرط كحماية
-    # إذا حاول المشرف (Admin) الدخول إلى هذه الصفحة، يتم تحويله إلى لوحة تحكم الأدمن.
-    if request.user.is_staff:
-        return redirect('admin:index')
-
     profile = request.user.profile
     if profile.role != Profile.ROLE_STUDENT:
         return redirect("accounts:teacher_dashboard")
@@ -297,7 +297,8 @@ def student_dashboard(request):
     # ===== تسجيل حضور اليوم تلقائيًا =====
     today = timezone.localdate()
 
-    if today.weekday() == 5:
+    # نظّف حضور أقدم من اليوم مرة كل سبت (اختياري)
+    if today.weekday() == 5:  # Monday=0 ... Saturday=5
         Attendance.objects.filter(student=profile, date__lt=today).delete()
 
     Attendance.objects.get_or_create(
@@ -306,16 +307,19 @@ def student_dashboard(request):
         defaults={"status": "present"}
     )
 
+    # آخر 7 أيام حضور (بترتيب زمني)
     week_attendance = Attendance.objects.filter(
         student=profile
     ).order_by("-date")[:7][::-1]
 
     # ===== المهام المعروضة للطالب =====
+    # التسميعات المسندة لحلقة الطالب
     recitations = (
         Recitation.objects
         .filter(halaqa=profile.halaqa)
         .select_related("halaqa", "created_by")
     )
+    # اربط تسليم الطالب بكل تسميع (لو موجود)
     rec_subs = RecitationSubmission.objects.filter(
         student=profile, recitation__in=recitations
     )
@@ -323,6 +327,7 @@ def student_dashboard(request):
     for r in recitations:
         setattr(r, "sub", rec_sub_map.get(r.id))
 
+    # المراجعات بنفس الفكرة
     reviews = (
         Review.objects
         .filter(halaqa=profile.halaqa)
@@ -346,35 +351,57 @@ def student_dashboard(request):
     else:
         h_date = ""
 
+    # --- بداية التعديلات المطلوبة ---
+
     # ===== إحصائيات الأسبوع (من Submissions فقط) =====
     now = timezone.now()
     week_ago = now - timedelta(days=7)
 
     rec_subs_week = RecitationSubmission.objects.filter(
-        student=profile, created_at__gte=week_ago, created_at__lte=now
+        student=profile, 
+        created_at__gte=week_ago, 
+        created_at__lte=now,
+        status="graded"  # نهتم فقط بالتسليمات التي تم تصحيحها
     ).select_related("recitation")
 
     rev_subs_week = ReviewSubmission.objects.filter(
-        student=profile, created_at__gte=week_ago, created_at__lte=now
+        student=profile, 
+        created_at__gte=week_ago, 
+        created_at__lte=now,
+        status="graded"
     ).select_related("review")
 
-    ACCEPTED_STATUSES = ["accepted", "approved", "graded"]
-    accepted_rec = rec_subs_week.filter(status__in=ACCEPTED_STATUSES)
-    accepted_rev = rev_subs_week.filter(status__in=ACCEPTED_STATUSES)
-    
-    # تم نقل الدالة المساعدة لداخل النطاق أو تعريفها في الأعلى
-    # def _range_len(obj): ...
+    # --- بداية التعديلات ---
 
+    # حساب متوسط درجات التسميعات الأسبوعية
+    total_rec_score = rec_subs_week.aggregate(total=Sum('score'))['total'] or 0
+    count_rec = rec_subs_week.count()
+    # يتم الحساب بناءً على أن الدرجة من 10، ثم نضرب في 10 للحصول على نسبة مئوية
+    recitation_proficiency_pct = round((total_rec_score / (count_rec * 10)) * 100, 1) if count_rec > 0 else 0.0
+
+    # حساب متوسط درجات المراجعات الأسبوعية
+    total_rev_score = rev_subs_week.aggregate(total=Sum('score'))['total'] or 0
+    count_rev = rev_subs_week.count()
+    review_proficiency_pct = round((total_rev_score / (count_rev * 10)) * 100, 1) if count_rev > 0 else 0.0
+
+
+    def _range_len(obj):
+        """عدد الآيات = end_ayah - start_ayah + 1 (لو الحقول موجودة)."""
+        try:
+            s = int(getattr(obj, "start_ayah", 0) or 0)
+            e = int(getattr(obj, "end_ayah", 0) or 0)
+            return (e - s + 1) if (s and e and e >= s) else 0
+        except Exception:
+            return 0
+
+    # حساب إجمالي عدد الآيات (من التسليمات المصححة)
     ayahs_memorized = 0
-    for s in accepted_rec:
+    for s in rec_subs_week: # لم نعد بحاجة لفلترة status هنا
         ayahs_memorized += _range_len(s.recitation)
-    for s in accepted_rev:
+    for s in rev_subs_week:
         ayahs_memorized += _range_len(s.review)
 
-    attempted = rec_subs_week.count() + rev_subs_week.count()
-    accepted  = accepted_rec.count() + accepted_rev.count()
-    proficiency_pct = round((accepted / attempted) * 100, 1) if attempted else 0.0
-
+    # حساب نسبة الحضور (تبقى كما هي)
     held = len(week_attendance)
     present = sum(1 for a in week_attendance if getattr(a, "status", "") == "present")
     attendance_pct = round((present / held) * 100, 1) if held else 0.0
@@ -385,10 +412,13 @@ def student_dashboard(request):
         "recitations": recitations,
         "reviews": reviews,
         "week_attendance": week_attendance,
-        "weekly_score": proficiency_pct,
+
+        # الإحصائيات بالمنطق الجديد والصحيح
+        "recitation_score": recitation_proficiency_pct,
+        "review_score": review_proficiency_pct,
         "ayah_count": ayahs_memorized,
-        "accuracy_pct": proficiency_pct,
         "presence_pct": attendance_pct,
+
         "g_date": g_date,
         "h_date": h_date,
         "now": timezone.now(),
@@ -396,38 +426,250 @@ def student_dashboard(request):
     return render(request, "students/student_dashboard.html", ctx)
 
 
+
+
+
+
+
+
+# ولا تنس تحديث دالة لوحة تحكم المعلم الرئيسية
 @login_required(login_url="accounts:login")
 def teacher_dashboard(request):
-    # تعديل: أضفنا هذا الشرط كحماية
-    # إذا حاول المشرف (Admin) الدخول إلى هذه الصفحة، يتم تحويله إلى لوحة تحكم الأدمن.
+    # --- التحقق من صلاحيات المعلم (لا تغيير هنا) ---
     if request.user.is_staff:
         return redirect('admin:index')
+    profile = request.user.profile
+    if profile.role != Profile.ROLE_TEACHER:
+        return redirect("accounts:student_dashboard")
+    if profile.teacher_status != Profile.TEACHER_APPROVED:
+        return redirect("accounts:login")
 
+    # --- جلب البيانات (لا تغيير هنا) ---
+    my_halaqat = Halaqa.objects.filter(teachers=profile).prefetch_related('students')
+    pending_submissions_count = RecitationSubmission.objects.filter(recitation__halaqa__in=my_halaqat, status='submitted').count()
+    total_students_count = Profile.objects.filter(halaqa__in=my_halaqat, role=Profile.ROLE_STUDENT).count()
+    active_halaqat_count = my_halaqat.count()
+    
+    avg_performance_rec = RecitationSubmission.objects.filter(recitation__halaqa__in=my_halaqat, status='graded').aggregate(avg_score=Avg('score'))['avg_score'] or 0
+    average_performance = round(avg_performance_rec * 10, 1) if avg_performance_rec else 0
+
+    latest_rec_subs = RecitationSubmission.objects.filter(recitation__halaqa__in=my_halaqat, status='submitted').order_by('-created_at')[:5]
+
+    halaqat_with_stats = []
+    for halaqa in my_halaqat:
+        # ---- 👇 بداية التعديل 👇 ----
+        last_recitation = Recitation.objects.filter(halaqa=halaqa).order_by('-created_at').first()
+        last_review = Review.objects.filter(halaqa=halaqa).order_by('-created_at').first()
+        
+        halaqat_with_stats.append({
+            'halaqa': halaqa,
+            'student_count': halaqa.students.count(),
+            'last_recitation_date': last_recitation.created_at if last_recitation else None,
+            'last_review_date': last_review.created_at if last_review else None,
+        })
+
+    # --- تحويل التاريخ إلى هجري ---
+    today_gregorian = date.today()
+    hijri_date = _Gregorian(today_gregorian.year, today_gregorian.month, today_gregorian.day).to_hijri()
+    
+    # 👇 --- هذا هو السطر الذي تم تصحيحه --- 👇
+    formatted_hijri_date = f"{hijri_date.day_name('ar')}، {hijri_date.day} {hijri_date.month_name('ar')} {hijri_date.year}"
+
+
+
+    # --- إرسال البيانات بالأسماء الصحيحة للقالب ---
+    context = {
+        'pending_submissions_count': pending_submissions_count,
+        'total_students_count': total_students_count,
+        'active_halaqat_count': active_halaqat_count,
+        'average_performance': average_performance,
+        'latest_submissions': latest_rec_subs,
+        'halaqat_list': halaqat_with_stats,
+        'today_date': formatted_hijri_date
+
+    }
+    
+    return render(request, 'teachers/teacher_dashboard.html', context)
+
+
+
+# في ملف: apps/accounts/views.py
+
+@login_required
+def teacher_halaqat(request):
     profile = request.user.profile
     if profile.role != Profile.ROLE_TEACHER:
         return redirect("accounts:student_dashboard")
 
-    if profile.teacher_status != Profile.TEACHER_APPROVED:
-        return redirect("accounts:login")
+    my_halaqat = Halaqa.objects.filter(teachers=profile)
 
-    my_halaqat = Halaqa.objects.filter(teachers=profile).distinct()
-    recitations = (Recitation.objects
-                   .filter(halaqa__in=my_halaqat)
-                   .select_related("halaqa", "created_by")
-                   .order_by("-id"))
-    
-    ctx = {
-        "profile": profile,
-        "halaqat": my_halaqat,
-        "recitations": recitations,
+    # --- بداية منطق الفرز ---
+    sort_option = request.GET.get('sort', 'name_asc') # الافتراضي هو الترتيب الأبجدي
+
+    if sort_option == 'name_desc':
+        my_halaqat = my_halaqat.order_by('-name')
+    elif sort_option == 'students_desc':
+        my_halaqat = my_halaqat.annotate(student_count=Count('students')).order_by('-student_count')
+    elif sort_option == 'students_asc':
+        my_halaqat = my_halaqat.annotate(student_count=Count('students')).order_by('student_count')
+    else: # name_asc هو الافتراضي
+        my_halaqat = my_halaqat.order_by('name')
+    # --- نهاية منطق الفرز ---
+
+    halaqat_with_stats = []
+    for halaqa in my_halaqat:
+        student_count = halaqa.students.count()
+        completion_percentage = 75 # مثال ثابت
+        halaqat_with_stats.append({
+            'halaqa': halaqa,
+            'student_count': student_count,
+            'completion_percentage': completion_percentage,
+        })
+
+    context = {
+        'halaqat_list': halaqat_with_stats,
+        'current_sort': sort_option # نرسل خيار الفرز الحالي للقالب
     }
-    return render(request, "teachers/teacher_dashboard.html", ctx)
+    
+    return render(request, 'teachers/halaqat.html', context)
+
+
+
+# في ملف: apps/accounts/views.py
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.db.models import Max, Avg, Q
+from .models import Profile, Halaqa # تأكد من أن المسار صحيح لنماذجك
+
+@login_required
+def teacher_students(request):
+    # --- 1. التحقق من أن المستخدم هو معلم ---
+    profile = get_object_or_404(Profile, user=request.user)
+    if profile.role != Profile.ROLE_TEACHER:
+        return redirect("accounts:student_dashboard") # أو أي صفحة أخرى مناسبة
+
+    # --- 2. بناء الاستعلام الأساسي لجلب الطلاب ---
+    # نبدأ بجلب كل الطلاب المرتبطين بالحلقات التي يشرف عليها هذا المعلم
+    students_query = Profile.objects.filter(
+        role=Profile.ROLE_STUDENT,
+        halaqa__teachers=profile
+    ).distinct()
+
+    # --- 3. تطبيق فلترة الحلقة (إذا تم اختيار حلقة من القائمة) ---
+    halaqa_id = request.GET.get('halaqa')
+    if halaqa_id:
+        students_query = students_query.filter(halaqa__id=halaqa_id)
+        
+    # --- 4. إضافة البيانات الإضافية (تاريخ التسليم ومتوسط الأداء) ---
+    students_query = students_query.annotate(
+        # جلب تاريخ آخر تسليم للتسميعات
+        last_submission_date=Max('recitation_submissions__created_at'),
+        # جلب متوسط الأداء (الدرجات) من التسميعات المصححة فقط
+        avg_performance=Avg('recitation_submissions__score', filter=Q(recitation_submissions__status='graded'))
+    )
+
+    # --- 5. تطبيق الفرز ---
+    sort_by = request.GET.get('sort', 'name_asc') # الفرز الافتراضي حسب الاسم تصاعديًا
+    
+    if sort_by == 'name_desc':
+        students_query = students_query.order_by('-user__username')
+    elif sort_by == 'performance_desc':
+        students_query = students_query.order_by('-avg_performance')
+    elif sort_by == 'performance_asc':
+        students_query = students_query.order_by('avg_performance')
+    elif sort_by == 'submission_desc':
+        students_query = students_query.order_by('-last_submission_date')
+    else: # name_asc هو الخيار الافتراضي
+        students_query = students_query.order_by('user__username')
+
+    # --- 6. (الأهم) جلب قائمة حلقات المعلم لعرضها في الفلتر ---
+    # هذا هو الجزء الذي يحل مشكلة الفلتر الفارغ
+    teacher_halaqas = Halaqa.objects.filter(teachers=profile)
+
+    # --- 7. تجهيز وإرسال البيانات إلى القالب ---
+    context = {
+        'students_list': students_query,
+        'teacher_halaqas': teacher_halaqas, # إرسال قائمة الحلقات إلى القالب
+    }
+    
+    return render(request, 'teachers/students.html', context)
+
+
+
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from .models import Profile, Halaqa # تأكد من استيراد النماذج الصحيحة
+
+@login_required
+def teacher_students_view(request):
+    # نتأكد من أن المستخدم الحالي هو معلم مسجل دخوله
+    teacher_profile = get_object_or_404(Profile, user=request.user, role='teacher')
+    
+    # نبدأ بجلب كل الطلاب الموجودين في حلقات هذا المعلم
+    students_list = Profile.objects.filter(
+        role='student',
+        halaqa__teachers=teacher_profile
+    ).distinct()
+
+    # --- (هذا الجزء خاص بالفلترة عند اختيار حلقة من النافذة) ---
+    halaqa_id = request.GET.get('halaqa')
+    if halaqa_id:
+        students_list = students_list.filter(halaqa__id=halaqa_id)
+    
+    # --- (هذا الجزء خاص بالفرز) ---
+    sort_by = request.GET.get('sort', 'name_asc') # فرز افتراضي حسب الاسم
+    if sort_by == 'name_desc':
+        students_list = students_list.order_by('-user__username')
+    else:
+        students_list = students_list.order_by('user__username')
+
+    # ✅✅ الجزء الأهم لحل مشكلتك ✅✅
+    # هنا نقوم بجلب قائمة الحلقات التي يشرف عليها المعلم فقط
+    teacher_halaqas = Halaqa.objects.filter(teachers=teacher_profile)
+
+    context = {
+        'students_list': students_list,
+        'teacher_halaqas': teacher_halaqas, # نقوم بتمرير قائمة الحلقات إلى القالب
+    }
+    # تأكد من أن مسار القالب صحيح
+    return render(request, 'tracker/teacher_students.html', context)
+
+
+
+# في ملف views.py
+
+@login_required
+@require_POST # لضمان أن هذا الطلب لا يتم إلا من خلال POST لمزيد من الأمان
+def unassign_student_from_halaqa(request, student_id):
+    # التأكد من أن المستخدم الحالي هو معلم
+    if not request.user.profile.role == 'teacher':
+        return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+
+    try:
+        student_to_unassign = Profile.objects.get(id=student_id, role='student')
+        
+        # التأكد من أن هذا الطالب يتبع للمعلم الحالي (إجراء أمني إضافي)
+        if student_to_unassign.halaqa and request.user.profile in student_to_unassign.halaqa.teachers.all():
+            student_to_unassign.halaqa = None # تعيين الحلقة إلى "لا شيء"
+            student_to_unassign.save()
+            return JsonResponse({'status': 'success', 'message': 'Student unassigned successfully.'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Student not found in your halaqas.'}, status=404)
+            
+    except Profile.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Student not found.'}, status=404)
+
 
 
 # ========= التسجيل/الرفع للتسميع =========
 
 @login_required(login_url="accounts:login")
 def recitation_start(request, pk):
+    """صفحة واجهة التسجيل (لو بتستخدم صفحة منفصلة)."""
     profile = get_object_or_404(Profile, user=request.user, role=Profile.ROLE_STUDENT)
     recitation = get_object_or_404(Recitation, pk=pk, halaqa=profile.halaqa)
     return render(request, "students/recitation_record.html", {
@@ -439,6 +681,7 @@ def recitation_start(request, pk):
 @require_POST
 @login_required(login_url="accounts:login")
 def recitation_submit(request, pk):
+    """رفع تسجيل صوت التسميع وحفظ/تحديث التسليم."""
     student = request.user.profile
     if student.role != Profile.ROLE_STUDENT:
         return HttpResponseForbidden()
@@ -465,6 +708,9 @@ def recitation_submit(request, pk):
 @require_POST
 @login_required(login_url="accounts:login")
 def recitation_action(request, pk):
+    """
+    زر "إعادة التسميع"
+    """
     profile = get_object_or_404(Profile, user=request.user, role=Profile.ROLE_STUDENT)
     recitation = get_object_or_404(Recitation, pk=pk, halaqa=profile.halaqa)
 
@@ -481,6 +727,9 @@ def recitation_action(request, pk):
 @require_POST
 @login_required(login_url="accounts:login")
 def review_action(request, pk):
+    """
+    زر "إعادة المراجعة"
+    """
     profile = get_object_or_404(Profile, user=request.user, role=Profile.ROLE_STUDENT)
     review = get_object_or_404(Review, pk=pk, halaqa=profile.halaqa)
 
@@ -492,3 +741,254 @@ def review_action(request, pk):
         messages.info(request, "إجراء غير معروف.")
 
     return redirect("accounts:student_dashboard")
+
+
+
+
+
+# accounts/views.py
+
+# ... (أضف هذه الدوال مع باقي دوال العرض في ملفك)
+
+@login_required
+def get_halaqa_surahs(request, halaqa_id):
+    """
+    هذه الدالة تعمل كـ API صغير.
+    عندما يطلبها الـ JavaScript، تقوم بإرجاع قائمة السور المرتبطة بالحلقة
+    بناءً على نفس منطق نطاق الأجزاء الموجود في لوحة تحكم الأدمن.
+    """
+    try:
+        # تأكد أن المعلم الحالي هو المسؤول عن هذه الحلقة
+        halaqa = Halaqa.objects.get(id=halaqa_id, teachers=request.user.profile)
+        
+        # نفس منطق الفلترة الذكي من ملف admin.py
+        if halaqa.juz_from and halaqa.juz_to:
+            surahs = Surah.objects.filter(
+                juz_from__lte=halaqa.juz_to,
+                juz_to__gte=halaqa.juz_from
+            ).order_by("id")
+        else:
+            surahs = Surah.objects.none() # لا ترجع أي سور إذا لم يتم تحديد نطاق أجزاء للحلقة
+
+        surahs_list = [{'id': surah.id, 'name': surah.name} for surah in surahs]
+        return JsonResponse({'surahs': surahs_list})
+        
+    except Halaqa.DoesNotExist:
+        return JsonResponse({'error': 'Halaqa not found or you do not have permission.'}, status=404)
+
+
+
+
+
+@login_required
+@require_POST
+def add_halaqa_task(request):
+    try:
+        from django.utils.dateparse import parse_datetime
+
+        halaqa_id   = request.POST.get('halaqa_id')
+        task_type   = request.POST.get('task_type', 'recitation')
+        surah_id    = request.POST.get('surah_id')   # يفضل تبقي بالاسم ده
+        start_ayah  = request.POST.get('start_ayah')
+        end_ayah    = request.POST.get('end_ayah')
+        deadline_s  = request.POST.get('deadline')
+
+        halaqa = Halaqa.objects.get(id=halaqa_id, teachers=request.user.profile)
+        surah  = get_object_or_404(Surah, pk=surah_id)
+        deadline = parse_datetime(deadline_s) if deadline_s else None
+
+        task_data = {
+            'halaqa': halaqa,
+            'created_by': request.user.profile,
+            'surah': surah.name,   # ← احفظ الاسم كنص
+            'start_ayah': start_ayah,
+            'end_ayah': end_ayah,
+            'deadline': deadline,
+        }
+
+        if task_type == 'review':
+            Review.objects.create(**task_data)
+        else:
+            Recitation.objects.create(**task_data)
+
+        return JsonResponse({'status': 'success', 'message': f'تمت إضافة المهمة بنجاح لحلقة {halaqa.name}.'})
+    except Halaqa.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'الحلقة غير موجودة أو ليس لديك صلاحية.'}, status=403)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'حدث خطأ غير متوقع: {str(e)}'}, status=500)
+
+
+
+
+
+
+@login_required(login_url="accounts:login")
+def halaqa_details_view(request, halaqa_id):
+    """
+    صفحة تفاصيل الحلقة مع إحصائيات محسوبة بكفاءة.
+    """
+    # صلاحية المعلم
+    halaqa = get_object_or_404(Halaqa, id=halaqa_id, teachers=request.user.profile)
+
+    # --- 1) الإحصائيات العامة للكروت العلوية ---
+    student_count = halaqa.students.count()
+    
+    # متوسط الأداء العام للحلقة (من التسليمات المصححة فقط)
+    avg_performance_query = RecitationSubmission.objects.filter(
+        recitation__halaqa=halaqa, status='graded'
+    ).aggregate(avg=Avg('score'))
+    avg_performance = round((avg_performance_query['avg'] or 0) * 10, 1)
+
+    # ✅ تسليمات قيد التصحيح (التسميع + المراجعة) لحلقة واحدة
+    pending_submissions_halaqa = (
+        RecitationSubmission.objects.filter(recitation__halaqa=halaqa, status='submitted').count()
+        + ReviewSubmission.objects.filter(review__halaqa=halaqa, status='submitted').count()
+    )
+
+    # --- 2) سجل المهام الأخيرة ---
+    recitations = Recitation.objects.filter(halaqa=halaqa).select_related('created_by__user')
+    reviews     = Review.objects.filter(halaqa=halaqa).select_related('created_by__user')
+    for r in recitations: r.type = 'تسميع'
+    for v in reviews:     v.type = 'مراجعة'
+    all_tasks = sorted(chain(recitations, reviews), key=attrgetter('created_at'), reverse=True)
+    recent_tasks = all_tasks[:30]
+
+    # --- 3) إحصائيات لكل طالب ---
+    from django.db.models import Subquery, OuterRef, Count
+
+    avg_score_subquery = RecitationSubmission.objects.filter(
+        student=OuterRef('pk'),
+        status='graded'
+    ).values('student').annotate(avg_s=Avg('score')).values('avg_s')
+
+    late_tasks_subquery = Recitation.objects.filter(
+        halaqa=halaqa,
+        deadline__lt=timezone.now()
+    ).exclude(
+        submissions__student=OuterRef('pk')
+    ).values('halaqa').annotate(count=Count('id')).values('count')
+
+    students_list = halaqa.students.select_related('user').annotate(
+        avg_score=Subquery(avg_score_subquery),
+        late_submissions_count=Subquery(late_tasks_subquery)
+    ).order_by('user__username')
+
+    # --- 4) السياق ---
+    context = {
+        'halaqa': halaqa,
+        'student_count': student_count,
+        'avg_performance': avg_performance,
+        'recent_tasks': recent_tasks,
+        'students_list': students_list,
+        'pending_submissions_halaqa': pending_submissions_halaqa,
+    }
+    return render(request, 'teachers/halaqa_details.html', context)
+
+
+
+
+@login_required
+@require_POST
+def add_student_task(request):
+    try:
+        from django.utils.dateparse import parse_datetime
+
+        halaqa_id   = request.POST.get('halaqa_id')
+        student_id  = request.POST.get('student_id')
+        task_type   = request.POST.get('task_type', 'recitation')
+        surah_id    = request.POST.get('surah_id')
+        start_ayah  = request.POST.get('start_ayah')
+        end_ayah    = request.POST.get('end_ayah')
+        deadline_s  = request.POST.get('deadline')
+
+        halaqa  = get_object_or_404(Halaqa, id=halaqa_id, teachers=request.user.profile)
+        student = get_object_or_404(Profile, id=student_id, role=Profile.ROLE_STUDENT)
+        if student.halaqa_id != halaqa.id:
+            return JsonResponse({'status': 'error', 'message': 'الطالب ليس ضمن هذه الحلقة.'}, status=400)
+
+        surah    = get_object_or_404(Surah, pk=surah_id)
+        deadline = parse_datetime(deadline_s) if deadline_s else None
+
+        base = {
+            'halaqa': halaqa,
+            'created_by': request.user.profile,
+            'surah': surah.name,   # ← اسم السورة كنص
+            'start_ayah': start_ayah,
+            'end_ayah': end_ayah,
+            'deadline': deadline,
+        }
+
+        obj = Review(**base) if task_type == 'review' else Recitation(**base)
+        if hasattr(obj, 'assigned_to'):
+            setattr(obj, 'assigned_to', student)
+        obj.save()
+
+        return JsonResponse({'status': 'success', 'message': f'تمت إضافة المهمة للطالب {student.user.username}.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'{e}'}, status=500)
+
+
+
+
+
+
+import json
+from .models import Halaqa, Profile, Notification 
+
+# ... باقي دوال الـ views الخاصة بك ...
+
+
+@require_POST
+@login_required(login_url="accounts:login")
+def send_halaqa_notification(request, halaqa_id):
+    """
+    View لإرسال إشعار لجميع طلاب حلقة معينة.
+    يستقبل الطلب عبر AJAX ويقوم بإنشاء الإشعارات بشكل مجمع.
+    """
+    profile = request.user.profile
+    if profile.role != Profile.ROLE_TEACHER:
+        return JsonResponse({'status': 'error', 'message': 'ليس لديك صلاحية للقيام بهذا الإجراء.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        title = data.get('title', '').strip()
+        message = data.get('message', '').strip()
+
+        if not message:
+            return JsonResponse({'status': 'error', 'message': 'محتوى الرسالة لا يمكن أن يكون فارغًا.'}, status=400)
+
+        halaqa = get_object_or_404(Halaqa, id=halaqa_id)
+
+        # خطوة أمان هامة: التأكد من أن المعلم الحالي يدير هذه الحلقة
+        if not halaqa.teachers.filter(id=profile.id).exists():
+            return JsonResponse({'status': 'error', 'message': 'أنت غير مسجل كمعلم في هذه الحلقة.'}, status=403)
+
+        students = halaqa.students.all()
+        if not students.exists():
+             return JsonResponse({'status': 'error', 'message': 'لا يوجد طلاب في هذه الحلقة لإرسال الإشعار إليهم.'}, status=400)
+
+        final_title = title if title else f'رسالة جديدة بخصوص حلقة {halaqa.name}'
+
+        notifications_to_create = [
+            Notification(
+                recipient=student,
+                title=final_title,
+                message=message
+            )
+            for student in students
+        ]
+
+        # استخدام bulk_create لحفظ كل الإشعارات في استعلام واحد (أداء أفضل)
+        Notification.objects.bulk_create(notifications_to_create)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'تم إرسال الإشعار بنجاح إلى {len(students)} طالب.'
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'status': 'error', 'message': 'بيانات الطلب غير صالحة.'}, status=400)
+    except Halaqa.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'الحلقة المطلوبة غير موجودة.'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': 'حدث خطأ غير متوقع في الخادم.'}, status=500)

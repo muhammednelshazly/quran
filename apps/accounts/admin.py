@@ -40,11 +40,38 @@ class ProfileAdmin(admin.ModelAdmin):
     list_filter   = ("role", "teacher_status", "halaqa")
     search_fields = ("user__username", "user__first_name", "user__last_name")
 
+    # --- بداية التعديلات ---
+
+    def get_fieldsets(self, request, obj=None):
+        """
+        هذه الدالة هي مفتاح الحل.
+        تقوم بتغيير مجموعات الحقول المعروضة بناءً على دور المستخدم.
+        """
+        # الحقول الأساسية المشتركة دائمًا
+        base_fields = ('user', 'role', 'photo')
+
+        if obj and obj.role == Profile.ROLE_TEACHER:
+            # إذا كان الدور "معلم"، اعرض هذه الحقول
+            return (
+                ('المعلومات الأساسية', {'fields': base_fields}),
+                ('بيانات المعلم', {'fields': ('institution', 'bio', 'certificate', 'teacher_status')}),
+            )
+        
+        # في أي حالة أخرى (بما في ذلك عند إنشاء بروفايل جديد أو لو كان الدور "طالب")
+        # اعرض حقول الطالب
+        return (
+            ('المعلومات الأساسية', {'fields': base_fields}),
+            ('بيانات الطالب', {'fields': ('halaqa', 'gender', 'birth_date', 'guardian_phone')}),
+        )
+
+    # --- نهاية التعديلات ---
+
     def halaqa_name(self, obj):
         return obj.halaqa.name if obj.halaqa else "-"
     halaqa_name.short_description = "الحلقة"
 
     def teacher_status_display(self, obj):
+        # The correction is on this line: ROLE_TEACHER instead of ROLE_TECH
         return obj.teacher_status.title() if obj.role == Profile.ROLE_TEACHER else "-"
     teacher_status_display.short_description = "حالة المعلم"
 

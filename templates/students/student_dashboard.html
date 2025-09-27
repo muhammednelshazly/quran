@@ -92,20 +92,30 @@
 
   <!-- Sidebar -->
   <aside id="sidebar" class="fixed top-0 left-0 z-30 flex h-full w-80 flex-col gap-6 border-r border-border-light bg-sidebar-light px-6 pt-28 shadow-subtle transition-transform transform -translate-x-full lg:translate-x-0 dark:border-border-dark dark:bg-sidebar-dark">
-    <div class="flex flex-col rounded-xl border border-border-light bg-card-light p-5 shadow-md dark:border-border-dark dark:bg-card-dark">
-      <h3 class="mb-3 text-base font-bold text-primary">التقييم الأسبوعي</h3>
-      <div class="mb-3 flex items-center justify-center">
-        <div class="relative h-28 w-28">
-          <svg class="h-full w-full" viewBox="0 0 36 36">
-            <path class="text-gray-200 dark:text-gray-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke-width="3.5"></path>
-            <path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831" fill="none" stroke-dasharray="{{ weekly_score|default:0 }}, 100" stroke-linecap="round" stroke-width="3.5"></path>
-          </svg>
-          <div class="absolute inset-0 flex items-center justify-center">
-            <span class="text-3xl font-bold text-primary">{{ weekly_score }}%</span>
-          </div>
-        </div>
+    <div class="flex flex-col gap-4 rounded-xl border border-border-light bg-card-light p-5 shadow-md dark:border-border-dark dark:bg-card-dark">
+      <h3 class="text-base font-bold text-primary">التقييم الأسبوعي</h3>
+      
+      <div class="flex items-center justify-between">
+        <span class="font-bold text-secondary-light dark:text-secondary-dark">التسميعات:</span>
+        <span class="text-2xl font-bold text-primary">{{ recitation_score }}%</span>
       </div>
-      <p class="text-center text-sm text-secondary-light dark:text-secondary-dark">ممتاز! حافظ على هذا المستوى الرائع.</p>
+
+      <div class="flex items-center justify-between">
+        <span class="font-bold text-secondary-light dark:text-secondary-dark">المراجعات:</span>
+        <span class="text-2xl font-bold text-primary">{{ review_score }}%</span>
+      </div>
+
+      <div class="border-t border-border-light dark:border-border-dark pt-3">
+        <p class="text-center text-sm text-secondary-light dark:text-secondary-dark">
+          {% if recitation_score >= 90 and review_score >= 90 %}
+            ممتاز! حافظ على هذا المستوى الرائع.
+          {% elif recitation_score > 70 or review_score > 70 %}
+            أداء جيد، استمر في التقدم!
+          {% else %}
+            تحتاج إلى بذل المزيد من الجهد هذا الأسبوع.
+          {% endif %}
+        </p>
+      </div>
     </div>
 
     <div class="flex flex-col rounded-xl border border-border-light bg-card-light p-5 shadow-md dark:border-border-dark dark:bg-card-dark">
@@ -275,8 +285,6 @@
                   {{ v.surah }}
                   {% if v.start_ayah and v.end_ayah %}
                     — من آية {{ v.start_ayah }} إلى {{ v.end_ayah }}
-                  {% else %}
-                    {{ v.range_text }}
                   {% endif %}
                 </h4>
                 <div class="mt-1 flex items-center gap-1.5 text-secondary-light dark:text-secondary-dark">
@@ -292,7 +300,7 @@
 
               <div class="flex-shrink-0">
                 {% if sub and sub.status == "graded" %}
-                  <span class="inline-flex items-center rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">مراجعة مكتملة</span>
+                  <span class="inline-flex items-center rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">مكتملة</span>
                 {% elif sub and sub.status == "submitted" %}
                   <span class="inline-flex items-center rounded-full bg-warning/20 px-3 py-1 text-xs font-bold text-warning">في الانتظار</span>
                 {% else %}
@@ -306,7 +314,11 @@
             </div>
 
             <div class="mt-auto pt-4">
-              {% if sub %}
+              {% if sub and sub.status == "submitted" %}
+                <button class="w-full cursor-not-allowed rounded-lg bg-gray-200 py-2.5 px-4 font-bold text-gray-500 flex items-center justify-center gap-2" disabled>
+                  <span class="material-symbols-outlined">history</span><span>تم التسليم</span>
+                </button>
+              {% elif sub and sub.status == "graded" %}
                 <form method="post" action="{% url 'accounts:review_action' v.id %}">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="retry">
@@ -315,9 +327,12 @@
                   </button>
                 </form>
               {% else %}
-                <!-- لو عندك endpoint لتسليم مراجعة، بدّل الـ href/الزر هنا -->
-                <button class="w-full rounded-lg bg-gray-200 py-2.5 px-4 font-bold text-gray-500 cursor-not-allowed">
-                  قريبًا: بدء المراجعة
+                <button
+                  class="open-recitation mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 font-bold text-white hover:bg-primary-accent"
+                  data-id="{{ v.id }}"
+                  data-title="مراجعة: {{ v.surah }} {% if v.start_ayah and v.end_ayah %}من آية {{ v.start_ayah }} إلى {{ v.end_ayah }}{% endif %}"
+                  data-submit-url="{% url 'accounts:recitation_submit' v.id %}">
+                  <span class="material-symbols-outlined">play_arrow</span><span>ابدأ المراجعة</span>
                 </button>
               {% endif %}
             </div>

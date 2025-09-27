@@ -1,0 +1,74 @@
+{% extends "teacher_base.html" %}
+{% load custom_tags %}
+
+{% block title %}إدارة الحلقات{% endblock %}
+
+{% block content %}
+    <header class="flex items-center justify-between mb-8">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-4xl text-primary">groups</span>
+            <h1 class="text-3xl font-bold">الحلقات الخاصة بك</h1>
+        </div>
+        
+        <div class="relative" x-data="{ open: false }">
+            <button @click="open = !open" class="bg-primary/10 text-primary flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm hover:bg-primary/20 transition-colors">
+                <span class="material-symbols-outlined">filter_list</span>
+                <span>فرز</span>
+                <span class="material-symbols-outlined transition-transform" :class="{'rotate-180': open}">expand_more</span>
+            </button>
+
+            <div x-show="open" @click.away="open = false" x-transition class="absolute left-0 mt-2 w-56 bg-card rounded-lg shadow-lg z-10 border border-gray-200">
+                <a href="?sort=name_asc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'name_asc' %}font-bold text-primary{% endif %}">
+                    الترتيب الأبجدي (أ - ي)
+                </a>
+                <a href="?sort=name_desc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'name_desc' %}font-bold text-primary{% endif %}">
+                    الترتيب الأبجدي (ي - أ)
+                </a>
+                <a href="?sort=students_desc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'students_desc' %}font-bold text-primary{% endif %}">
+                    الأكثر عددًا بالطلاب
+                </a>
+                <a href="?sort=students_asc" class="block px-4 py-2 text-sm text-text-primary hover:bg-background {% if current_sort == 'students_asc' %}font-bold text-primary{% endif %}">
+                    الأقل عددًا بالطلاب
+                </a>
+            </div>
+        </div>
+        </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        {% for item in halaqat_list %}
+        <div class="bg-card p-6 rounded-xl shadow-subtle flex flex-col gap-4">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h2 class="text-lg font-bold">{{ item.halaqa.name }}</h2>
+                    <p class="text-sm text-text-secondary">المعلم: {{ request.user.username }}</p>
+                </div>
+                <div class="relative size-16">
+                    <svg class="size-full" viewBox="0 0 36 36">
+                        <circle class="stroke-current text-primary/20" cx="18" cy="18" fill="none" r="16" stroke-width="3"></circle>
+                        <circle class="stroke-current text-primary" cx="18" cy="18" fill="none" r="16" stroke-dasharray="100" stroke-dashoffset="{{ 100|sub:item.completion_percentage }}" stroke-linecap="round" stroke-width="3" transform="rotate(-90 18 18)"></circle>
+                    </svg>
+                    <span class="absolute inset-0 flex items-center justify-center text-sm font-bold text-primary">{{ item.completion_percentage }}%</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 text-text-secondary">
+                <span class="material-symbols-outlined text-base">people</span>
+                <span class="text-sm">{{ item.student_count }} طالب</span>
+            </div>
+            <div class="flex items-center gap-2 mt-auto pt-4 border-t border-background">
+                <button class="bg-primary/10 text-primary w-full py-2 rounded-lg text-sm font-bold hover:bg-primary/20 transition-colors">عرض التفاصيل</button>
+                <button class="bg-secondary/20 text-secondary w-full py-2 rounded-lg text-sm font-bold hover:bg-secondary/30 transition-colors">إضافة مهمة</button>
+            </div>
+        </div>
+        {% empty %}
+        <div class="md:col-span-2 lg:col-span-3 bg-card p-6 rounded-xl shadow-subtle text-center text-text-secondary">
+            <p>لم يتم إسناد أي حلقات لك حتى الآن. يرجى مراجعة المشرف.</p>
+        </div>
+        {% endfor %}
+    </div>
+{% endblock %}
+
+
+{% block extra_js %}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
