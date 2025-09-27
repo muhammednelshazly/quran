@@ -1,0 +1,144 @@
+{% extends "teacher_base.html" %}
+{% load static %}
+
+{% block title %}إدارة التسليمات - منصة آية{% endblock %}
+
+{% block content %}
+<header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div>
+        <h2 class="text-3xl font-extrabold text-text-primary dark:text-text-primary-dark">إدارة التسليمات</h2>
+        <p class="text-text-secondary dark:text-text-secondary-dark mt-1">تقييم ومتابعة تسميعات ومراجعات الطلاب.</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <div class="relative">
+            <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark pointer-events-none">search</span>
+            <input type="text" placeholder="بحث باسم الطالب..." class="w-full sm:w-64 bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark rounded-lg pl-4 pr-10 py-2 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition">
+        </div>
+    </div>
+</header>
+
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark p-6 rounded-xl shadow-subtle flex items-center gap-5">
+        <div class="bg-secondary/10 dark:bg-secondary/20 text-secondary p-3 rounded-full">
+            <span class="material-symbols-outlined text-2xl">pending_actions</span>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">بانتظار التقييم</p>
+            <p class="text-3xl font-bold text-text-primary dark:text-text-primary-dark mt-1">15</p>
+        </div>
+    </div>
+    <div class="bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark p-6 rounded-xl shadow-subtle flex items-center gap-5">
+        <div class="bg-green-500/10 dark:bg-green-500/20 text-green-500 p-3 rounded-full">
+            <span class="material-symbols-outlined text-2xl">check_circle</span>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">مكتملة هذا الأسبوع</p>
+            <p class="text-3xl font-bold text-text-primary dark:text-text-primary-dark mt-1">82</p>
+        </div>
+    </div>
+    <div class="bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark p-6 rounded-xl shadow-subtle flex items-center gap-5">
+        <div class="bg-red-500/10 dark:bg-red-500/20 text-red-500 p-3 rounded-full">
+            <span class="material-symbols-outlined text-2xl">error</span>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">تحتاج لإعادة</p>
+            <p class="text-3xl font-bold text-text-primary dark:text-text-primary-dark mt-1">5</p>
+        </div>
+    </div>
+    <div class="bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark p-6 rounded-xl shadow-subtle flex items-center gap-5">
+         <div class="bg-primary/10 dark:bg-primary/20 text-primary p-3 rounded-full">
+            <span class="material-symbols-outlined text-2xl">schedule</span>
+        </div>
+        <div>
+            <p class="text-sm font-medium text-text-secondary dark:text-text-secondary-dark">متوسط وقت التقييم</p>
+            <p class="text-3xl font-bold text-text-primary dark:text-text-primary-dark mt-1">12 ساعة</p>
+        </div>
+    </div>
+</section>
+
+<section class="bg-card dark:bg-card-dark rounded-xl shadow-subtle border border-border-color dark:border-border-color-dark">
+    <div class="p-4 sm:p-6 border-b border-border-color dark:border-border-color-dark">
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-2 bg-background dark:bg-background-dark p-1.5 rounded-lg">
+                <button class="px-4 py-1.5 text-sm font-bold bg-card dark:bg-card-dark text-primary dark:text-success rounded-md shadow-sm">بانتظار التقييم</button>
+                <button class="px-4 py-1.5 text-sm font-medium text-text-secondary dark:text-text-secondary-dark rounded-md">المكتملة</button>
+                <button class="px-4 py-1.5 text-sm font-medium text-text-secondary dark:text-text-secondary-dark rounded-md">الكل</button>
+            </div>
+            <select id="halaqa-filter" class="w-full sm:w-auto bg-transparent border-none text-text-secondary dark:text-text-secondary-dark focus:ring-0">
+                <option>فلترة حسب الحلقة</option>
+                <option>حلقة النور</option>
+                <option>حلقة الفرقان</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full text-right">
+            <thead class="bg-gray-50 dark:bg-white/5">
+                <tr>
+                    <th scope="col" class="px-6 py-3 font-semibold text-sm text-text-primary dark:text-text-primary-dark">الطالب</th>
+                    <th scope="col" class="px-6 py-3 font-semibold text-sm text-text-primary dark:text-text-primary-dark">الحلقة</th>
+                    <th scope="col" class="px-6 py-3 font-semibold text-sm text-text-primary dark:text-text-primary-dark">النطاق</th>
+                    <th scope="col" class="px-6 py-3 font-semibold text-sm text-text-primary dark:text-text-primary-dark text-center">التقييم</th>
+                    <th scope="col" class="px-6 py-3 font-semibold text-sm text-text-primary dark:text-text-primary-dark">تاريخ التسليم</th>
+                    <th scope="col" class="px-6 py-3 font-semibold text-sm text-text-primary dark:text-text-primary-dark text-center">الإجراء</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-border-color dark:divide-border-color-dark">
+                <tr class="hover:bg-background dark:hover:bg-background-dark/50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <img class="h-10 w-10 rounded-full object-cover" src="https://i.pravatar.cc/150?u=a042581f4e29026704a" alt="ليلى العساف avatar">
+                            <div>
+                                <div class="text-sm font-bold text-text-primary dark:text-text-primary-dark">ليلى العساف</div>
+                                <div class="text-xs text-text-secondary dark:text-text-secondary-dark">تسميع</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary dark:text-text-secondary-dark">حلقة النور</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">سورة الناس: ١ - ٦</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary dark:text-text-secondary-dark text-center">-</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary dark:text-text-secondary-dark">منذ ساعتين</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <button class="bg-primary hover:bg-primary/90 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                            <span class="material-symbols-outlined text-base">play_arrow</span>
+                            <span>تقييم الآن</span>
+                        </button>
+                    </td>
+                </tr>
+                <tr class="hover:bg-background dark:hover:bg-background-dark/50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <img class="h-10 w-10 rounded-full object-cover" src="https://i.pravatar.cc/150?u=a042581f4e29026704b" alt="محمد السالم avatar">
+                            <div>
+                                <div class="text-sm font-bold text-text-primary dark:text-text-primary-dark">محمد السالم</div>
+                                <div class="text-xs text-text-secondary dark:text-text-secondary-dark">مراجعة</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary dark:text-text-secondary-dark">حلقة الفرقان</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">سورة الفاتحة: ١ - ٧</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-center text-green-600 dark:text-green-400">9.5/10</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-text-secondary dark:text-text-secondary-dark">أمس</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-center">
+                        <button class="bg-primary/10 hover:bg-primary/20 text-primary dark:text-success dark:bg-success/20 dark:hover:bg-success/30 text-sm font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                            <span class="material-symbols-outlined text-base">visibility</span>
+                            <span>عرض التقييم</span>
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <nav class="flex items-center justify-between p-4 border-t border-border-color dark:border-border-color-dark" aria-label="Table navigation">
+        <span class="text-sm font-normal text-text-secondary dark:text-text-secondary-dark">
+            عرض <span class="font-semibold text-text-primary dark:text-text-primary-dark">1-10</span> من <span class="font-semibold text-text-primary dark:text-text-primary-dark">100</span>
+        </span>
+        <ul class="inline-flex items-center -space-x-px">
+            <li><a href="#" class="px-3 h-8 flex items-center justify-center text-text-secondary dark:text-text-secondary-dark bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark rounded-r-lg hover:bg-background dark:hover:bg-background-dark">السابق</a></li>
+            <li><a href="#" class="px-3 h-8 flex items-center justify-center text-text-secondary dark:text-text-secondary-dark bg-card dark:bg-card-dark border border-border-color dark:border-border-color-dark rounded-l-lg hover:bg-background dark:hover:bg-background-dark">التالي</a></li>
+        </ul>
+    </nav>
+</section>
+{% endblock %}

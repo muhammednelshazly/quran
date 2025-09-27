@@ -39,31 +39,24 @@ AR_HIJRI_MONTHS = [
 
 
 def landing_page(request):
-    # لو عايز تحويل تلقائي لداشبورد المسجلين:
     # if request.user.is_authenticated: return redirect('go')
     return render(request, 'landing_page.html')
 
 
 def go(request):
-    """
-    بوابة التوجيه من أزرار الصفحة الرئيسية.
-    """
+
     user = request.user
 
-    # لو الدور موجود كـ attribute أو في profile
     role = getattr(user, 'role', None)
     if role is None and hasattr(user, 'profile'):
         role = getattr(user.profile, 'role', None)
 
-    # لو الطالب
     if role == 'student' or user.groups.filter(name__iexact='student').exists():
         return HttpResponseRedirect('/dashboard/')
 
-    # لو المعلّم
     if role == 'teacher' or user.groups.filter(name__iexact='teacher').exists():
         return HttpResponseRedirect('/teacher/dashboard/')
 
-    # لو مفيش دور أو أي مشكلة → رجّعه على اللوجين
     return HttpResponseRedirect('/login/')
 
 
@@ -71,7 +64,6 @@ def home_view(request):
     return render(request, "home.html")
 
 
-# ========= تسجيل الدخول / الخروج =========
 
 def login_view(request):
     if request.method == "POST":
@@ -84,7 +76,6 @@ def login_view(request):
             messages.error(request, "من فضلك أكمل كل الحقول واختر نوع الحساب (طالب/معلم).")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # السماح بتسجيل الدخول عبر البريد أو اسم المستخدم
         username = identifier
         if "@" in identifier:
             user_obj = User.objects.filter(email__iexact=identifier).first()
@@ -95,26 +86,21 @@ def login_view(request):
             messages.error(request, "بيانات الدخول غير صحيحة.")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # الإدمن يروح للوحة /admin
         if user.is_staff or user.is_superuser:
             return redirect("/admin/")
 
-        # تأكيد البروفايل
         if not hasattr(user, "profile"):
             Profile.objects.create(user=user)
 
-        # نوع الحساب لازم يطابق الاختيار
         if user.profile.role != role:
             messages.error(request, "نوع الحساب لا يطابق الاختيار (طالب/معلم).")
             return render(request, "accounts/login.html", {"selected_role": role})
 
-        # معلم غير معتمد؟
         if role == Profile.ROLE_TEACHER and user.profile.teacher_status != Profile.TEACHER_APPROVED:
             messages.error(request, "حساب المعلم قيد المراجعة من المشرف. سيتم إشعارك عند الاعتماد.")
             return render(request, "accounts/login.html", {"selected_role": role})
 
         login(request, user)
-        # الجلسة: 0 = تُغلق بخروج المتصفح، أو 14 يوم لو Remember me
         request.session.set_expiry(0 if not remember_me else 14 * 24 * 3600)
         # messages.success(request, "تم تسجيل الدخول بنجاح.")
         if user.profile.role == Profile.ROLE_STUDENT:
@@ -1102,3 +1088,11 @@ def grade_submission(request, submission_id):
             "average_performance": average_performance,
         }
     })
+
+
+
+@login_required
+def teacher_submissions(request):
+    # في المستقبل، ستقوم بجلب بيانات التسليمات الحقيقية هنا
+    context = {} 
+    return render(request, 'teachers/submissions.html', context)

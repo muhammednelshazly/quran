@@ -43,5 +43,8 @@ urlpatterns = [
     path('api/submission/<int:submission_id>/', views.get_submission_details, name='get_submission_details'),
     path('teacher/submission/<int:submission_id>/grade/', views.grade_submission, name='grade_submission'),
 
+    path('teacher/submissions/', views.teacher_submissions, name='teacher_submissions'),
+
+
 
 ]
