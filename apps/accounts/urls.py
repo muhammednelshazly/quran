@@ -59,7 +59,17 @@ urlpatterns = [
 
 
 
+    path('settings/', views.student_settings_view, name='student_settings'), # <-- أضف هذا السطر
 
+
+
+    path('review/<int:task_id>/submit/', views.review_submit_view, name='review_submit'),
+
+
+    path('student/settings/', views.student_settings_view, name='student_settings'),
+
+
+    path('submit_task/<str:task_type>/<int:task_id>/', views.submit_task, name='submit_task'),
 
 
 ]

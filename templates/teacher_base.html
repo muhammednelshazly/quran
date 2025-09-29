@@ -70,69 +70,87 @@
 <body class="bg-background dark:bg-background-dark font-display text-text-primary dark:text-text-primary-dark antialiased">
     <div class="flex h-screen overflow-hidden">
 
-
-    <aside class="fixed top-0 right-0 z-30 h-full w-64 bg-card dark:bg-card-dark border-l border-border-color dark:border-border-color-dark flex flex-col p-4">
-        
-        <div class="flex-grow">
-            <div class="flex items-center gap-3 mb-10 px-2">
-                <div class="bg-primary p-2 rounded-lg flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" fill="none">
-                        <path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="white"></path>
-                    </svg>
-                </div>
-                <h1 class="text-xl font-bold">منصة آية</h1>
-            </div>
+        <aside id="sidebar" class="fixed top-0 right-0 z-40 h-full w-64 bg-card dark:bg-card-dark border-l border-border-color dark:border-border-color-dark flex flex-col p-4 transform transition-transform duration-300 ease-in-out translate-x-full md:translate-x-0">
             
-            <nav class="flex flex-col gap-3">
-                <a href="{% url 'accounts:teacher_dashboard' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_dashboard' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
-                    <span class="material-symbols-outlined">home</span>
-                    <span>الرئيسية</span>
-                </a>
-                <a href="{% url 'accounts:teacher_halaqat' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_halaqat' or request.resolver_match.url_name == 'halaqa_details' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
-                    <span class="material-symbols-outlined">groups</span>
-                    <span>الحلقات</span>
-                </a>
-                <a href="{% url 'accounts:teacher_submissions' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_submissions' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
-                    <span class="material-symbols-outlined">task_alt</span>
-                    <span>التسليمات</span>
-                </a>
-                <a href="{% url 'accounts:teacher_students' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_students' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
-                    <span class="material-symbols-outlined">school</span>
-                    <span>الطلاب</span>
-                </a>
-            </nav>
-        </div>
-
-        <div class="flex flex-col gap-2">
-            <div class="border-t border-border-color dark:border-border-color-dark pt-3 flex flex-col gap-2">
-                <a href="{% url 'accounts:teacher_settings' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success transition-colors duration-200">
-                    <span class="material-symbols-outlined">settings</span>
-                    <span>الإعدادات</span>
-                </a>
-                <a href="{% url 'accounts:logout' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success transition-colors duration-200">
-                    <span class="material-symbols-outlined">logout</span>
-                    <span>تسجيل الخروج</span>
-                </a>
-            </div>
-            
-            {% if user.is_authenticated %}
-            <div class="mt-2">
-                <div class="flex items-center gap-3 p-3 bg-background dark:bg-background-dark rounded-lg">
-                    <img src="{{ user.profile.avatar_url }}" alt="Avatar" class="w-10 h-10 rounded-full object-cover">
-                    <div class="flex-grow">
-                        <p class="font-bold text-sm text-text-primary dark:text-text-primary-dark">{{ user.username }}</p>
-                        <p class="text-xs text-text-secondary dark:text-text-secondary-dark">{{ user.profile.get_role_display }}</p>
+            <div class="flex-grow">
+                <div class="flex items-center gap-3 mb-10 px-2">
+                    <div class="bg-primary p-2 rounded-lg flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48" fill="none">
+                            <path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="white"></path>
+                        </svg>
                     </div>
-                    <button id="theme-toggle" class="text-text-secondary dark:text-text-secondary-dark hover:text-primary dark:hover:text-success p-2 rounded-full">
-                        <span class="material-symbols-outlined" id="theme-icon">dark_mode</span>
-                    </button>
+                    <h1 class="text-xl font-bold">منصة آية</h1>
                 </div>
+                
+                <nav class="flex flex-col gap-3">
+                    <a href="{% url 'accounts:teacher_dashboard' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_dashboard' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
+                        <span class="material-symbols-outlined">home</span>
+                        <span>الرئيسية</span>
+                    </a>
+                    <a href="{% url 'accounts:teacher_halaqat' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_halaqat' or request.resolver_match.url_name == 'halaqa_details' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
+                        <span class="material-symbols-outlined">groups</span>
+                        <span>الحلقات</span>
+                    </a>
+                    <a href="{% url 'accounts:teacher_submissions' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_submissions' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
+                        <span class="material-symbols-outlined">task_alt</span>
+                        <span>التسليمات</span>
+                    </a>
+                    <a href="{% url 'accounts:teacher_students' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 {% if request.resolver_match.url_name == 'teacher_students' %}bg-primary/10 text-primary dark:text-success dark:bg-success/20 font-bold{% else %}text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success{% endif %}">
+                        <span class="material-symbols-outlined">school</span>
+                        <span>الطلاب</span>
+                    </a>
+                </nav>
             </div>
-            {% endif %}
-        </div>
-    </aside>
 
-        <main class="flex-1 mr-64 overflow-y-auto">
+            <div class="flex flex-col gap-2">
+                <div class="border-t border-border-color dark:border-border-color-dark pt-3 flex flex-col gap-2">
+                    <a href="{% url 'accounts:teacher_settings' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success transition-colors duration-200">
+                        <span class="material-symbols-outlined">settings</span>
+                        <span>الإعدادات</span>
+                    </a>
+                    <a href="{% url 'accounts:logout' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary dark:text-text-secondary-dark hover:bg-primary/5 dark:hover:bg-primary/20 hover:text-primary dark:hover:text-success transition-colors duration-200">
+                        <span class="material-symbols-outlined">logout</span>
+                        <span>تسجيل الخروج</span>
+                    </a>
+                </div>
+                
+                {% if user.is_authenticated %}
+                <div class="mt-2">
+                    <div class="flex items-center gap-3 p-3 bg-background dark:bg-background-dark rounded-lg">
+                        <img src="{{ user.profile.avatar_url }}" alt="Avatar" class="w-10 h-10 rounded-full object-cover">
+                        <div class="flex-grow">
+                            <p class="font-bold text-sm text-text-primary dark:text-text-primary-dark">{{ user.username }}</p>
+                            <p class="text-xs text-text-secondary dark:text-text-secondary-dark">{{ user.profile.get_role_display }}</p>
+                        </div>
+                        <button id="theme-toggle" class="text-text-secondary dark:text-text-secondary-dark hover:text-primary dark:hover:text-success p-2 rounded-full">
+                            <span class="material-symbols-outlined" id="theme-icon">dark_mode</span>
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </aside>
+
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden"></div>
+
+        <main class="flex-1 md:mr-64 overflow-y-auto">
+            
+            <header class="md:hidden sticky top-0 z-20 bg-card/90 dark:bg-card-dark/90 backdrop-blur-sm border-b border-border-color dark:border-border-color-dark">
+                <div class="px-4">
+                    <div class="flex items-center justify-between h-16">
+                        <a href="{% url 'accounts:teacher_dashboard' %}" class="flex items-center gap-2 text-text-primary dark:text-text-primary-dark">
+                             <div class="bg-primary p-1.5 rounded-md flex items-center justify-center">
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48" fill="none"><path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="white"></path></svg>
+                             </div>
+                             <span class="font-bold">منصة آية</span>
+                        </a>
+                        <button id="menu-toggle" class="p-2 text-text-secondary dark:text-text-secondary-dark">
+                            <span class="material-symbols-outlined text-3xl">menu</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
             <div class="px-6 py-10 lg:px-8">
                 {% block content %}
                 {% endblock %}
@@ -146,7 +164,12 @@
     
     {% block extra_js %}
     <script>
-        // دوال النافذة المنبثقة العامة
+    document.addEventListener('DOMContentLoaded', function () {
+        // =========================================================================
+        // SECTION 1: الكود الأصلي الخاص بك (النوافذ المنبثقة + الوضع الليلي)
+        // =========================================================================
+
+        // --- دوال النافذة المنبثقة العامة ---
         let activeModal = null;
         const body = document.body;
         const openModal = (modalElement) => {
@@ -174,9 +197,7 @@
             }
         });
 
-        // =========================================================================
-        // 2. دوال JavaScript المخصصة لتشغيل النافذة الموحدة الخاصة بك
-        // =========================================================================
+        // --- دوال JavaScript المخصصة لتشغيل نافذة "إضافة مهمة" ---
         const loadSurahsForHalaqa = async (halaqaId, modalElement) => {
             const surahSelect = modalElement.querySelector('#surah-select');
             if (!surahSelect) return;
@@ -184,7 +205,6 @@
             surahSelect.innerHTML = '<option value="">جاري تحميل السور...</option>';
             surahSelect.disabled = true;
             try {
-                // تأكد من أن هذا المسار صحيح في urls.py
                 const response = await fetch(`/accounts/api/halaqa/${halaqaId}/surahs/`);
                 if (!response.ok) throw new Error('Network response was not ok');
                 const data = await response.json();
@@ -200,72 +220,101 @@
             }
         };
         
-        // الدالة التي يتم استدعاؤها عند الضغط على زر "إضافة مهمة"
         window.openAddTaskModal = (halaqaId, halaqaName) => {
             const modalElement = document.getElementById('addTaskModal');
             if (!modalElement) {
                 console.error('Add Task Modal not found!');
                 return;
             }
-            // استهداف العناصر بالـ ID الصحيح من ملف _task_form_modal.html
             modalElement.querySelector('#task-halaqa-id').value = halaqaId;
             modalElement.querySelector('#modal-halaqa-name').textContent = halaqaName;
             loadSurahsForHalaqa(halaqaId, modalElement);
             openModal(modalElement);
         };
 
-        // الكود الخاص بالتحكم في أزرار نوع المهمة داخل النافذة
-        // الكود الخاص بالتحكم في أزرار نوع المهمة داخل النافذة
-        document.addEventListener('DOMContentLoaded', () => {
-            const modal = document.getElementById('addTaskModal');
-            if(modal) {
-                const recitationBtn = modal.querySelector('#recitation-btn');
-                const reviewBtn = modal.querySelector('#review-btn');
-                const taskTypeInput = modal.querySelector('#task-type-input');
-                
-                // تعريف الـ classes الكاملة لكل حالة لتجنب أي تعارض
-                const activeClasses = "task-type-btn w-1/2 py-2.5 px-4 rounded-md font-bold text-sm transition-all duration-300 bg-card dark:bg-card-dark text-primary dark:text-success shadow-sm";
-                const inactiveClasses = "task-type-btn w-1/2 py-2.5 px-4 rounded-md font-bold text-sm transition-all duration-300 text-text-secondary dark:text-text-secondary-dark";
+        const modal = document.getElementById('addTaskModal');
+        if(modal) {
+            const recitationBtn = modal.querySelector('#recitation-btn');
+            const reviewBtn = modal.querySelector('#review-btn');
+            const taskTypeInput = modal.querySelector('#task-type-input');
+            const activeClasses = "task-type-btn w-1/2 py-2.5 px-4 rounded-md font-bold text-sm transition-all duration-300 bg-card dark:bg-card-dark text-primary dark:text-success shadow-sm";
+            const inactiveClasses = "task-type-btn w-1/2 py-2.5 px-4 rounded-md font-bold text-sm transition-all duration-300 text-text-secondary dark:text-text-secondary-dark";
 
+            if (recitationBtn) {
                 recitationBtn.addEventListener('click', () => {
                     taskTypeInput.value = 'recitation';
                     recitationBtn.className = activeClasses;
                     reviewBtn.className = inactiveClasses;
                 });
-
+            }
+            if (reviewBtn) {
                 reviewBtn.addEventListener('click', () => {
                     taskTypeInput.value = 'review';
                     reviewBtn.className = activeClasses;
                     recitationBtn.className = inactiveClasses;
                 });
             }
-        });
+        }
 
+        // --- كود الـ Dark Mode ---
+        const themeToggle = document.getElementById('theme-toggle');
+        if (themeToggle) {
+            const themeIcon = document.getElementById('theme-icon');
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                if (themeIcon) themeIcon.textContent = 'light_mode';
+            } else {
+                if (themeIcon) themeIcon.textContent = 'dark_mode';
+            }
 
-        // كود الـ Dark Mode الخاص بك (لم يتم المساس به)
-        document.addEventListener('DOMContentLoaded', function () {
-            const themeToggle = document.getElementById('theme-toggle');
-            if (themeToggle) {
-                const themeIcon = document.getElementById('theme-icon');
-                if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
+            themeToggle.addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                if (document.documentElement.classList.contains('dark')) {
+                    localStorage.setItem('theme', 'dark');
                     if (themeIcon) themeIcon.textContent = 'light_mode';
                 } else {
-                     if (themeIcon) themeIcon.textContent = 'dark_mode';
+                    localStorage.setItem('theme', 'light');
+                    if (themeIcon) themeIcon.textContent = 'dark_mode';
                 }
+            });
+        }
+        
+        // =========================================================================
+        // SECTION 2: الكود الجديد الخاص بالقائمة الجانبية المتجاوبة
+        // =========================================================================
+        const sidebar = document.getElementById('sidebar');
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
 
-                themeToggle.addEventListener('click', () => {
-                    document.documentElement.classList.toggle('dark');
-                    if (document.documentElement.classList.contains('dark')) {
-                        localStorage.setItem('theme', 'dark');
-                        if (themeIcon) themeIcon.textContent = 'light_mode';
-                    } else {
-                        localStorage.setItem('theme', 'light');
-                        if (themeIcon) themeIcon.textContent = 'dark_mode';
-                    }
-                });
+        function openSidebar() {
+            if (sidebar && sidebarOverlay) {
+                sidebar.classList.remove('translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
             }
-        });
+        }
+
+        function closeSidebar() {
+            if (sidebar && sidebarOverlay) {
+                sidebar.classList.add('translate-x-full');
+                sidebarOverlay.classList.add('hidden');
+            }
+        }
+
+        if (menuToggle) {
+            menuToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (sidebar.classList.contains('translate-x-full')) {
+                    openSidebar();
+                } else {
+                    closeSidebar();
+                }
+            });
+        }
+
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', closeSidebar);
+        }
+    });
     </script>
     {% endblock %}
 </body>

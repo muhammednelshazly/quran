@@ -17,7 +17,8 @@ from .forms import ProfileUpdateForm, CustomPasswordChangeForm
 from django.contrib.auth import update_session_auth_hash
 from .forms import ProfileUpdateForm, PasswordChangeForm
 from django.contrib.sessions.models import Session
-
+import types
+from django.template.loader import render_to_string
 try:
     from hijri_converter import Gregorian as _Gregorian
     HIJRI_OK = True
@@ -273,148 +274,201 @@ def _range_len(obj):
 
 
 
-
-
-
-
-# في ملف: apps/accounts/views.py
-
 @login_required(login_url="accounts:login")
 def student_dashboard(request):
-    profile = request.user.profile
+    profile = get_object_or_404(Profile, user=request.user)
     if profile.role != Profile.ROLE_STUDENT:
         return redirect("accounts:teacher_dashboard")
 
-    # ===== تسجيل حضور اليوم تلقائيًا =====
-    today = timezone.localdate()
-
-    # نظّف حضور أقدم من اليوم مرة كل سبت (اختياري)
-    if today.weekday() == 5:  # Monday=0 ... Saturday=5
-        Attendance.objects.filter(student=profile, date__lt=today).delete()
-
-    Attendance.objects.get_or_create(
-        student=profile,
-        date=today,
-        defaults={"status": "present"}
-    )
-
-    # آخر 7 أيام حضور (بترتيب زمني)
-    week_attendance = Attendance.objects.filter(
-        student=profile
-    ).order_by("-date")[:7][::-1]
-
-    # ===== المهام المعروضة للطالب =====
-    # التسميعات المسندة لحلقة الطالب
-    recitations = (
-        Recitation.objects
-        .filter(halaqa=profile.halaqa)
-        .select_related("halaqa", "created_by")
-    )
-    # اربط تسليم الطالب بكل تسميع (لو موجود)
-    rec_subs = RecitationSubmission.objects.filter(
-        student=profile, recitation__in=recitations
-    )
-    rec_sub_map = {s.recitation_id: s for s in rec_subs}
-    for r in recitations:
-        setattr(r, "sub", rec_sub_map.get(r.id))
-
-    # المراجعات بنفس الفكرة
-    reviews = (
-        Review.objects
-        .filter(halaqa=profile.halaqa)
-        .select_related("halaqa", "created_by")
-    )
-    rev_subs = ReviewSubmission.objects.filter(
-        student=profile, review__in=reviews
-    )
-    rev_sub_map = {s.review_id: s for s in rev_subs}
-    for rv in reviews:
-        setattr(rv, "sub", rev_sub_map.get(rv.id))
-
-    # ===== التاريخ الميلادي/الهجري (اختياري) =====
-    g_date = today.strftime("%Y-%m-%d")
-    if HIJRI_OK:
-        h = _Gregorian(today.year, today.month, today.day).to_hijri()
-        try:
-            h_date = f"{h.day} {h.month_name('ar')} {h.year}هـ"
-        except Exception:
-            h_date = f"{h.day}-{h.month}-{h.year}هـ"
-    else:
-        h_date = ""
-
-    # --- بداية التعديلات المطلوبة ---
-
-    # ===== إحصائيات الأسبوع (من Submissions فقط) =====
     now = timezone.now()
+    today = timezone.localdate()
+    
+    # --- 1. Attendance Logic ---
+    Attendance.objects.get_or_create(student=profile, date=today, defaults={"status": "present"})
+    start_date = today - timedelta(days=6)
+    existing_attendance = Attendance.objects.filter(student=profile, date__gte=start_date, date__lte=today)
+    attendance_map = {att.date: att for att in existing_attendance}
+    week_attendance = []
+    for i in range(7):
+        day_date = start_date + timedelta(days=i)
+        if day_date in attendance_map:
+            week_attendance.append(attendance_map[day_date])
+        else:
+            week_attendance.append(types.SimpleNamespace(date=day_date, status=None))
+
+    # --- 2. Fetch All Tasks & Submissions ---
+    recitations = Recitation.objects.filter(halaqa=profile.halaqa).select_related("halaqa", "created_by__user")
+    reviews = Review.objects.filter(halaqa=profile.halaqa).select_related("halaqa", "created_by__user")
+    rec_subs = RecitationSubmission.objects.filter(student=profile, recitation__in=recitations)
+    rev_subs = ReviewSubmission.objects.filter(student=profile, review__in=reviews)
+    
+    sub_map = {f"recitation_{s.recitation_id}": s for s in rec_subs}
+    sub_map.update({f"review_{s.review_id}": s for s in rev_subs})
+
+    all_tasks = []
+    for r in recitations:
+        setattr(r, "type", "recitation")
+        setattr(r, "sub", sub_map.get(f"recitation_{r.id}"))
+        setattr(r, "is_late", r.deadline and r.deadline < now and not r.sub)
+        all_tasks.append(r)
+    for rv in reviews:
+        setattr(rv, "type", "review")
+        setattr(rv, "sub", sub_map.get(f"review_{rv.id}"))
+        setattr(rv, "is_late", rv.deadline and rv.deadline < now and not rv.sub)
+        all_tasks.append(rv)
+
+    all_tasks.sort(key=lambda x: x.created_at, reverse=True)
+
+    for task in all_tasks:
+        if task.sub and task.sub.status == 'graded':
+            task.sub.score_percentage = (task.sub.score or 0) * 10
+            task.sub.hifdh_percentage = (task.sub.hifdh or 0) * 20
+            task.sub.rules_percentage = (task.sub.rules or 0) * 20
+            
+    # --- 3. Filter Tasks for Tabs ---
+    pending_tasks = [
+        t for t in all_tasks 
+        if not t.sub or (t.sub.status == 'graded' and t.sub.score is not None and t.sub.score < 5)
+    ]
+    submitted_tasks = [
+        t for t in all_tasks 
+        if t.sub and t.sub.status == 'submitted'
+    ]
+    graded_tasks = [
+        t for t in all_tasks 
+        if t.sub and t.sub.status == 'graded' and t.sub.score is not None and t.sub.score >= 5
+    ]
+    
+    # --- 4. Calculate All Statistics ---
     week_ago = now - timedelta(days=7)
+    
+    all_graded_recitations = RecitationSubmission.objects.filter(student=profile, status="graded")
+    all_graded_reviews = ReviewSubmission.objects.filter(student=profile, status="graded")
+    total_rec_score = all_graded_recitations.aggregate(total=Sum('score'))['total'] or 0
+    total_rev_score = all_graded_reviews.aggregate(total=Sum('score'))['total'] or 0
+    count_graded = all_graded_recitations.count() + all_graded_reviews.count()
+    total_score = total_rec_score + total_rev_score
+    accuracy_pct = round((total_score / (count_graded * 10)) * 100) if count_graded > 0 else 0
+    present_days = sum(1 for a in week_attendance if a.status == "present")
+    presence_pct = round((present_days / 7) * 100) if week_attendance else 0
+    
+    successful_recitations = RecitationSubmission.objects.filter(
+        student=profile, status="graded", score__gte=5
+    ).select_related('recitation')
+    ayah_count = sum(
+        (s.recitation.end_ayah - s.recitation.start_ayah + 1) 
+        for s in successful_recitations 
+        if s.recitation and s.recitation.start_ayah and s.recitation.end_ayah
+    )
+    
+    pending_tasks_count = len(pending_tasks)
+    weekly_hifdh_subs = RecitationSubmission.objects.filter(student=profile, created_at__gte=week_ago, status='graded')
+    hifdh_avg = weekly_hifdh_subs.aggregate(avg=Avg('score'))['avg'] or 0
+    weekly_hifdh_score = round((hifdh_avg / 10) * 100)
+    weekly_review_subs = ReviewSubmission.objects.filter(student=profile, created_at__gte=week_ago, status='graded')
+    review_avg = weekly_review_subs.aggregate(avg=Avg('score'))['avg'] or 0
+    weekly_review_score = round((review_avg / 10) * 100)
 
-    rec_subs_week = RecitationSubmission.objects.filter(
-        student=profile, 
-        created_at__gte=week_ago, 
-        created_at__lte=now,
-        status="graded"  # نهتم فقط بالتسليمات التي تم تصحيحها
-    ).select_related("recitation")
+    # --- **START OF CHANGE: Add teacher's name to context** ---
+    halaqa_teacher = profile.halaqa.teachers.first() if profile.halaqa else None
+    # --- **END OF CHANGE** ---
 
-    rev_subs_week = ReviewSubmission.objects.filter(
-        student=profile, 
-        created_at__gte=week_ago, 
-        created_at__lte=now,
-        status="graded"
-    ).select_related("review")
-
-    # --- بداية التعديلات ---
-
-    # حساب متوسط درجات التسميعات الأسبوعية
-    total_rec_score = rec_subs_week.aggregate(total=Sum('score'))['total'] or 0
-    count_rec = rec_subs_week.count()
-    # يتم الحساب بناءً على أن الدرجة من 10، ثم نضرب في 10 للحصول على نسبة مئوية
-    recitation_proficiency_pct = round((total_rec_score / (count_rec * 10)) * 100, 1) if count_rec > 0 else 0.0
-
-    # حساب متوسط درجات المراجعات الأسبوعية
-    total_rev_score = rev_subs_week.aggregate(total=Sum('score'))['total'] or 0
-    count_rev = rev_subs_week.count()
-    review_proficiency_pct = round((total_rev_score / (count_rev * 10)) * 100, 1) if count_rev > 0 else 0.0
-
-
-    def _range_len(obj):
-        """عدد الآيات = end_ayah - start_ayah + 1 (لو الحقول موجودة)."""
-        try:
-            s = int(getattr(obj, "start_ayah", 0) or 0)
-            e = int(getattr(obj, "end_ayah", 0) or 0)
-            return (e - s + 1) if (s and e and e >= s) else 0
-        except Exception:
-            return 0
-
-    # حساب إجمالي عدد الآيات (من التسليمات المصححة)
-    ayahs_memorized = 0
-    for s in rec_subs_week: # لم نعد بحاجة لفلترة status هنا
-        ayahs_memorized += _range_len(s.recitation)
-    for s in rev_subs_week:
-        ayahs_memorized += _range_len(s.review)
-
-    # حساب نسبة الحضور (تبقى كما هي)
-    held = len(week_attendance)
-    present = sum(1 for a in week_attendance if getattr(a, "status", "") == "present")
-    attendance_pct = round((present / held) * 100, 1) if held else 0.0
-
+    # --- 5. Final Context for Template ---
     ctx = {
-        "user": request.user,
         "profile": profile,
-        "recitations": recitations,
-        "reviews": reviews,
+        "pending_tasks": pending_tasks,
+        "submitted_tasks": submitted_tasks,
+        "graded_tasks": graded_tasks,
         "week_attendance": week_attendance,
-
-        # الإحصائيات بالمنطق الجديد والصحيح
-        "recitation_score": recitation_proficiency_pct,
-        "review_score": review_proficiency_pct,
-        "ayah_count": ayahs_memorized,
-        "presence_pct": attendance_pct,
-
-        "g_date": g_date,
-        "h_date": h_date,
-        "now": timezone.now(),
+        "pending_tasks_count": pending_tasks_count,
+        "accuracy_pct": accuracy_pct,
+        "presence_pct": presence_pct,
+        "ayah_count": ayah_count,
+        "weekly_hifdh_score": weekly_hifdh_score,
+        "weekly_review_score": weekly_review_score,
+        "halaqa_teacher_name": halaqa_teacher.user.username if halaqa_teacher else "غير محدد", # ADD THIS
+        "now": now,
     }
     return render(request, "students/student_dashboard.html", ctx)
+
+
+
+
+
+
+
+@require_POST
+@login_required(login_url="accounts:login")
+def submit_task(request, task_type, task_id):
+    if request.user.profile.role != Profile.ROLE_STUDENT:
+        return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+
+    audio_file = request.FILES.get('audio')
+    if not audio_file:
+        return JsonResponse({"status": "error", "message": "لم يصل ملف الصوت."}, status=400)
+
+    student = request.user.profile
+    task = None
+    submission = None
+
+    try:
+        if task_type == 'recitation':
+            task = get_object_or_404(Recitation, id=task_id, halaqa=student.halaqa)
+            submission, _ = RecitationSubmission.objects.update_or_create(
+                recitation=task, student=student,
+                defaults={'audio': audio_file, 'status': 'submitted', 'updated_at': timezone.now()}
+            )
+        elif task_type == 'review':
+            task = get_object_or_404(Review, id=task_id, halaqa=student.halaqa)
+            submission, _ = ReviewSubmission.objects.update_or_create(
+                review=task, student=student,
+                defaults={'audio': audio_file, 'status': 'submitted', 'updated_at': timezone.now()}
+            )
+        else:
+            return JsonResponse({'status': 'error', 'message': 'نوع المهمة غير صالح.'}, status=400)
+            
+        setattr(task, "type", task_type)
+        setattr(task, "sub", submission)
+        setattr(task, "is_late", task.deadline and task.deadline < timezone.now() and not task.sub)
+
+        task_card_html = render_to_string(
+            'students/partials/_task_item.html', 
+            {'task': task, 'sub': submission, 'request': request}
+        )
+        
+        # --- بداية الإصلاح النهائي ---
+        # حساب عدد المهام المطلوبة بشكل صحيح بعد التسليم
+        
+        pending_recitations = Recitation.objects.filter(
+            halaqa=student.halaqa
+        ).exclude(
+            submissions__student=student
+        ).count()
+
+        # تم تصحيح الخطأ هنا بناءً على رسالة الخطأ الجديدة
+        # اسم العلاقة الصحيح هو 'submissions' وليس 'reviewsubmission'
+        pending_reviews = Review.objects.filter(
+            halaqa=student.halaqa
+        ).exclude(
+            submissions__student=student 
+        ).count()
+        # --- نهاية الإصلاح النهائي ---
+
+        new_pending_count = pending_recitations + pending_reviews
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'تم التسليم بنجاح!',
+            'task_card_html': task_card_html,
+            'new_stats': {
+                'pending_tasks_count': new_pending_count
+            }
+        })
+
+    except Exception as e:
+        print(f"Error in submit_task: {e}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
 
 
 
@@ -1271,3 +1325,97 @@ def delete_account_view(request):
     # يمكنك إضافة أي منطق آخر هنا (مثل تسجيل الخروج)
     
     return JsonResponse({'status': 'success', 'message': 'تم حذف حسابك بنجاح.'})
+
+
+@login_required(login_url="accounts:login")
+def student_settings_view(request):
+    user = request.user
+    profile = user.profile
+
+    # التأكد من أن المستخدم طالب
+    if profile.role != 'student':
+        # يمكنك توجيهه إلى لوحة تحكم المعلم أو صفحة خطأ
+        return redirect('accounts:teacher_dashboard') 
+    
+    password_form = PasswordChangeForm(user)
+
+    if request.method == 'POST':
+        # التحقق من أي فورم تم إرساله
+        if 'update_profile' in request.POST:
+            full_name = request.POST.get('full_name')
+            user.first_name = full_name.split(' ')[0] if full_name else ''
+            user.last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
+            user.save()
+
+            if request.FILES.get('avatar'):
+                profile.avatar = request.FILES['avatar']
+                profile.save()
+
+            messages.success(request, 'تم تحديث ملفك الشخصي بنجاح!')
+            return redirect('accounts:student_settings')
+
+        elif 'change_password' in request.POST:
+            password_form = PasswordChangeForm(user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                # تحديث جلسة المستخدم لمنعه من تسجيل الخروج بعد تغيير كلمة المرور
+                update_session_auth_hash(request, user)  
+                messages.success(request, 'تم تغيير كلمة المرور بنجاح!')
+                return redirect('accounts:student_settings')
+            else:
+                # إذا كانت هناك أخطاء في فورم كلمة المرور، سيتم عرضها في القالب
+                messages.error(request, 'يرجى تصحيح الأخطاء أدناه.')
+
+    context = {
+        'profile': profile,
+        'password_form': password_form
+    }
+    return render(request, 'students/student_settings.html', context)
+
+
+
+
+@require_POST
+@login_required
+def review_submit_view(request, task_id):
+    review = Review.objects.get(id=task_id)
+    audio_file = request.FILES.get('audio')
+
+    if not audio_file:
+        return JsonResponse({'ok': False, 'msg': 'لم يتم رفع ملف صوتي.'}, status=400)
+
+    # إنشاء أو تحديث التسليم
+    submission, created = ReviewSubmission.objects.update_or_create(
+        student=request.user.profile,
+        review=review,
+        defaults={'audio_file': audio_file, 'status': 'submitted'}
+    )
+    
+    return JsonResponse({'ok': True, 'msg': 'تم تسليم المراجعة بنجاح.'})
+
+
+
+@require_POST
+@login_required
+def recitation_submit_view(request, task_id):
+    task = get_object_or_404(Recitation, id=task_id)
+    # ... (نفس منطق التسليم لديك)
+    submission, created = RecitationSubmission.objects.update_or_create(...)
+    
+    # --- التعديل الجديد: إرجاع JSON للتحديث الفوري ---
+    # إعادة تجهيز بيانات المهمة بعد التسليم لإرسالها للواجهة الأمامية
+    setattr(task, "type", "recitation")
+    setattr(task, "sub", submission)
+    
+    # حساب عدد المهام المطلوبة الجديد
+    pending_tasks_count = Recitation.objects.filter(...).count() + Review.objects.filter(...).count() # أكمل هذا بحسب منطق حساب المهام المطلوبة
+    
+    return JsonResponse({
+        'status': 'success',
+        'message': 'تم التسليم بنجاح!',
+        'task_id': task.id,
+        'task_type': 'recitation',
+        'updated_stats': {
+            'pending_tasks_count': pending_tasks_count
+        }
+    })
