@@ -71,5 +71,7 @@ urlpatterns = [
 
     path('submit_task/<str:task_type>/<int:task_id>/', views.submit_task, name='submit_task'),
 
+    
+
 
 ]

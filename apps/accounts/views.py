@@ -19,6 +19,7 @@ from .forms import ProfileUpdateForm, PasswordChangeForm
 from django.contrib.sessions.models import Session
 import types
 from django.template.loader import render_to_string
+from django.templatetags.static import static
 try:
     from hijri_converter import Gregorian as _Gregorian
     HIJRI_OK = True
@@ -133,121 +134,102 @@ def register_view(request):
             base.update(extra)
         return base
 
-    if request.method == "POST":
-        # 1) الحقول الأساسية
+    if request.method != "POST":
+        return render(request, "accounts/register.html", ctx())
+
+    is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
+    try:
+        # 1) استخلاص البيانات من الطلب
+        full_name = request.POST.get("full_name", "").strip()
         username = request.POST.get("username", "").strip()
-        email    = request.POST.get("email", "").strip().lower()
-        pw1      = request.POST.get("password1", "")
-        pw2      = request.POST.get("password2", "")
-        role     = request.POST.get("role", "")
+        email = request.POST.get("email", "").strip().lower()
+        pw1 = request.POST.get("password", "")
+        pw2 = request.POST.get("password2", "")
+        role = request.POST.get("role", "")
+        birth_date_str = request.POST.get("birth_date", "").strip()
+        gender = request.POST.get("gender") or None
+        guardian_phone = request.POST.get("guardian_phone") or None
+        halaqa_input = request.POST.get("halaqa") or None
+        institution = request.POST.get("institution") or None
+        bio = request.POST.get("bio") or None
+        certificate = request.FILES.get("certificate")
 
-        # حقول الطالب
-        birth_date_str  = request.POST.get("birth_date", "").strip()
-        gender          = request.POST.get("gender") or None
-        guardian_phone  = request.POST.get("guardian_phone") or None
-        halaqa_input    = request.POST.get("halaqa") or None  # id أو اسم
-
-        # حقول المعلّم
-        institution     = request.POST.get("institution") or None
-        bio             = request.POST.get("bio") or None
-        certificate     = request.FILES.get("certificate")  # اختياري
-
-        # 2) تحققات أساسية
-        if not all([username, email, pw1, pw2, role]):
-            messages.error(request, "من فضلك أكمل جميع الحقول الأساسية.")
-            return render(request, "accounts/register.html", ctx({"selected_role": role}))
-
-        if role not in (Profile.ROLE_STUDENT, Profile.ROLE_TEACHER):
-            messages.error(request, "برجاء اختيار نوع حساب صحيح (طالب/معلم).")
-            return render(request, "accounts/register.html", ctx({"selected_role": role}))
-
+        # 2) تجميع الأخطاء
+        errors = []
+        if not all([full_name, username, email, pw1, pw2, role, birth_date_str, gender]):
+             errors.append("من فضلك أكمل جميع الحقول الإجبارية (*).")
         if pw1 != pw2:
-            messages.error(request, "كلمتا المرور غير متطابقتين.")
-            return render(request, "accounts/register.html", ctx({"selected_role": role}))
-
+            errors.append("كلمتا المرور غير متطابقتين.")
         if User.objects.filter(username__iexact=username).exists():
-            messages.error(request, "اسم المستخدم مستخدم من قبل.")
-            return render(request, "accounts/register.html", ctx({"selected_role": role}))
-
+            errors.append("اسم المستخدم مستخدم من قبل.")
         if User.objects.filter(email__iexact=email).exists():
-            messages.error(request, "البريد الإلكتروني مسجل من قبل.")
-            return render(request, "accounts/register.html", ctx({"selected_role": role}))
+            errors.append("البريد الإلكتروني مسجل من قبل.")
 
-        # 3) تحققات خاصة بالطالب
         birth_date = None
-        if role == Profile.ROLE_STUDENT:
-            if not birth_date_str or not gender:
-                messages.error(request, "تاريخ الميلاد والجنس مطلوبان للطالب.")
-                return render(request, "accounts/register.html", ctx({"selected_role": role}))
-            try:
-                birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
-            except ValueError:
-                messages.error(request, "صيغة تاريخ الميلاد غير صحيحة.")
-                return render(request, "accounts/register.html", ctx({"selected_role": role}))
-
-            # لازم يختار حلقة صحيحة
-            halaqa_obj = None
-            if halaqa_input:
-                if str(halaqa_input).isdigit():
-                    halaqa_obj = Halaqa.objects.filter(id=int(halaqa_input)).first()
-                if not halaqa_obj:
-                    halaqa_obj = Halaqa.objects.filter(name=halaqa_input).first()
-            if not halaqa_obj:
-                messages.error(request, "من فضلك اختر حلقة صحيحة من القائمة.")
-                return render(request, "accounts/register.html", ctx({"selected_role": role}))
-        else:
-            halaqa_obj = None  # المعلم لا يُربط بحلقة هنا
-
-        # 4) إنشاء المستخدم + البروفايل
         try:
-            with transaction.atomic():
-                user = User.objects.create_user(username=username, email=email, password=pw1)
-                profile, _ = Profile.objects.get_or_create(user=user)
-                profile.role = role
+            birth_date = datetime.strptime(birth_date_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            errors.append("صيغة تاريخ الميلاد غير صحيحة.")
+        
+        halaqa_obj = None
+        if role == Profile.ROLE_STUDENT:
+            if not halaqa_input:
+                errors.append("اختيار الحلقة مطلوب للطالب.")
+            else:
+                halaqa_obj = Halaqa.objects.filter(id=halaqa_input).first()
+                if not halaqa_obj:
+                    errors.append("الحلقة المحددة غير صالحة.")
+        
+        if errors:
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': "<br>".join(errors)}, status=400)
+            else:
+                for error in errors: messages.error(request, error)
+                return render(request, "accounts/register.html", ctx())
 
-                if role == Profile.ROLE_STUDENT:
-                    profile.halaqa = halaqa_obj
-                    profile.birth_date = birth_date
-                    profile.gender = gender
-                    profile.guardian_phone = guardian_phone
-                    profile.institution = None
-                    profile.bio = None
-                    if getattr(profile, "certificate", None):
-                        profile.certificate.delete(save=False)
-                    profile.certificate = None
-                    # الطالب دائمًا Approved
-                    profile.teacher_status = Profile.TEACHER_APPROVED
-                else:
-                    # المعلّم Pending لحين اعتماد المشرف
-                    profile.teacher_status = Profile.TEACHER_PENDING
-                    profile.institution = institution
-                    profile.bio = bio
-                    if certificate:
-                        profile.certificate = certificate
-                    profile.halaqa = None
-                    profile.birth_date = None
-                    profile.gender = None
-                    profile.guardian_phone = None
+        # 3) إنشاء المستخدم والبروفايل (الطريقة الآمنة)
+        with transaction.atomic():
+            user = User.objects.create_user(username=username, email=email, password=pw1, first_name=full_name.split()[0], last_name=" ".join(full_name.split()[1:]))
+            
+            if role == Profile.ROLE_TEACHER:
+                user.is_active = False # حساب المعلم يحتاج مراجعة
+                user.save()
 
-                profile.save()
+            profile, created = Profile.objects.get_or_create(user=user)
+            profile.role = role
+            profile.full_name = full_name
+            profile.gender = gender
+            profile.birth_date = birth_date
 
-        except IntegrityError:
-            try:
-                user.delete()
-            except Exception:
-                pass
-            messages.error(request, "حدث خطأ أثناء إنشاء الحساب. حاول مرة أخرى.")
-            return render(request, "accounts/register.html", ctx({"selected_role": role}))
+            if role == Profile.ROLE_STUDENT:
+                profile.halaqa = halaqa_obj
+                profile.guardian_phone = guardian_phone
+                profile.teacher_status = Profile.TEACHER_APPROVED
+            else: # role is TEACHER
+                profile.institution = institution
+                profile.bio = bio
+                profile.certificate = certificate
+                profile.teacher_status = Profile.TEACHER_PENDING
+            
+            profile.save()
 
-        # 5) نجاح
-        if role == Profile.ROLE_TEACHER:
-            messages.success(request, "تم إنشاء الحساب! طلبك كمعلم قيد المراجعة من المشرف.")
-        else:
-            messages.success(request, "تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.")
+        # 4) إرجاع رسالة النجاح
+        if is_ajax:
+            return JsonResponse({'status': 'success', 'role': role})
+        
+        messages.success(request, "تم إنشاء الحساب بنجاح!")
         return redirect("accounts:login")
 
-    # GET
-    return render(request, "accounts/register.html", {"halaqas": Halaqa.objects.all().order_by("name")})
+    except Exception as e:
+        # التعامل مع أي خطأ غير متوقع
+        print(f"An unexpected error occurred: {e}") # لطباعة الخطأ في الكونسول للمساعدة
+        error_message = "حدث خطأ غير متوقع في الخادم. الرجاء المحاولة مرة أخرى."
+        if is_ajax:
+            return JsonResponse({'status': 'error', 'message': error_message}, status=500)
+        
+        messages.error(request, error_message)
+        return render(request, "accounts/register.html", ctx())
 
 
 # ========= لوحات التحكم =========
@@ -269,7 +251,6 @@ def _range_len(obj):
         return (e - s + 1) if (s and e and e >= s) else 0
     except Exception:
         return 0
-
 
 
 
@@ -296,9 +277,23 @@ def student_dashboard(request):
         else:
             week_attendance.append(types.SimpleNamespace(date=day_date, status=None))
 
-    # --- 2. Fetch All Tasks & Submissions ---
-    recitations = Recitation.objects.filter(halaqa=profile.halaqa).select_related("halaqa", "created_by__user")
-    reviews = Review.objects.filter(halaqa=profile.halaqa).select_related("halaqa", "created_by__user")
+    # --- 2. Fetch Filtered Tasks & Submissions ---
+    
+    # ===== بداية التعديل =====
+    # أضفنا فلتر التاريخ هنا لجلب المهام التي تم إنشاؤها بعد انضمام الطالب فقط
+    student_join_date = request.user.date_joined
+    
+    recitations = Recitation.objects.filter(
+        halaqa=profile.halaqa,
+        created_at__gte=student_join_date  # <-- الشرط الجديد
+    ).select_related("halaqa", "created_by__user", "surah")
+
+    reviews = Review.objects.filter(
+        halaqa=profile.halaqa,
+        created_at__gte=student_join_date  # <-- الشرط الجديد
+    ).select_related("halaqa", "created_by__user", "surah")
+    # ===== نهاية التعديل =====
+    
     rec_subs = RecitationSubmission.objects.filter(student=profile, recitation__in=recitations)
     rev_subs = ReviewSubmission.objects.filter(student=profile, review__in=reviews)
     
@@ -354,7 +349,7 @@ def student_dashboard(request):
     
     successful_recitations = RecitationSubmission.objects.filter(
         student=profile, status="graded", score__gte=5
-    ).select_related('recitation')
+    ).select_related('recitation__surah')
     ayah_count = sum(
         (s.recitation.end_ayah - s.recitation.start_ayah + 1) 
         for s in successful_recitations 
@@ -369,9 +364,7 @@ def student_dashboard(request):
     review_avg = weekly_review_subs.aggregate(avg=Avg('score'))['avg'] or 0
     weekly_review_score = round((review_avg / 10) * 100)
 
-    # --- **START OF CHANGE: Add teacher's name to context** ---
     halaqa_teacher = profile.halaqa.teachers.first() if profile.halaqa else None
-    # --- **END OF CHANGE** ---
 
     # --- 5. Final Context for Template ---
     ctx = {
@@ -386,13 +379,10 @@ def student_dashboard(request):
         "ayah_count": ayah_count,
         "weekly_hifdh_score": weekly_hifdh_score,
         "weekly_review_score": weekly_review_score,
-        "halaqa_teacher_name": halaqa_teacher.user.username if halaqa_teacher else "غير محدد", # ADD THIS
+        "halaqa_teacher_name": halaqa_teacher.user.get_full_name() or halaqa_teacher.user.username if halaqa_teacher else "غير محدد",
         "now": now,
     }
     return render(request, "students/student_dashboard.html", ctx)
-
-
-
 
 
 
@@ -1327,50 +1317,73 @@ def delete_account_view(request):
     return JsonResponse({'status': 'success', 'message': 'تم حذف حسابك بنجاح.'})
 
 
+
+
+
+
+# في ملف: apps/accounts/views.py
+
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
+from django.http import JsonResponse
+# ... (باقي imports الموجودة لديك)
+
 @login_required(login_url="accounts:login")
 def student_settings_view(request):
     user = request.user
     profile = user.profile
 
-    # التأكد من أن المستخدم طالب
     if profile.role != 'student':
-        # يمكنك توجيهه إلى لوحة تحكم المعلم أو صفحة خطأ
-        return redirect('accounts:teacher_dashboard') 
-    
-    password_form = PasswordChangeForm(user)
+        return redirect('accounts:teacher_dashboard')
 
     if request.method == 'POST':
-        # التحقق من أي فورم تم إرساله
-        if 'update_profile' in request.POST:
-            full_name = request.POST.get('full_name')
-            user.first_name = full_name.split(' ')[0] if full_name else ''
-            user.last_name = ' '.join(full_name.split(' ')[1:]) if ' ' in full_name else ''
-            user.save()
+        # بما أننا نستخدم AJAX، سنقوم بمعالجة البيانات ونعيد رد JSON
+        
+        # 1. تحديث معلومات الملف الشخصي
+        user.first_name = request.POST.get('full_name', '').split(' ')[0]
+        user.last_name = ' '.join(request.POST.get('full_name', '').split(' ')[1:])
+        user.save()
 
-            if request.FILES.get('avatar'):
-                profile.avatar = request.FILES['avatar']
-                profile.save()
+        if request.FILES.get('avatar'):
+            profile.avatar = request.FILES['avatar']
+        elif request.POST.get('remove_avatar') == 'true':
+            profile.avatar.delete(save=True)
+            
+        # 2. تحديث تفضيلات الإشعارات
+        profile.email_notifications = 'email_notifications' in request.POST
+        profile.save()
 
-            messages.success(request, 'تم تحديث ملفك الشخصي بنجاح!')
-            return redirect('accounts:student_settings')
-
-        elif 'change_password' in request.POST:
+        # 3. تحديث كلمة المرور (فقط إذا تم إدخال كلمة مرور جديدة)
+        if request.POST.get('new_password1'):
             password_form = PasswordChangeForm(user, request.POST)
             if password_form.is_valid():
                 user = password_form.save()
-                # تحديث جلسة المستخدم لمنعه من تسجيل الخروج بعد تغيير كلمة المرور
-                update_session_auth_hash(request, user)  
-                messages.success(request, 'تم تغيير كلمة المرور بنجاح!')
-                return redirect('accounts:student_settings')
+                update_session_auth_hash(request, user)
             else:
-                # إذا كانت هناك أخطاء في فورم كلمة المرور، سيتم عرضها في القالب
-                messages.error(request, 'يرجى تصحيح الأخطاء أدناه.')
+                # إرجاع الخطأ الأول الذي يظهر في الفورم
+                first_error = next(iter(password_form.errors.values()))[0]
+                return JsonResponse({'status': 'error', 'message': first_error}, status=400)
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'تم حفظ التغييرات بنجاح!',
+            'new_avatar_url': profile.avatar_url # لإرسال رابط الصورة الجديد وتحديثها في الصفحة
+        })
 
+    # في حالة طلب GET، نعرض الصفحة كالمعتاد
+    password_form = PasswordChangeForm(user)
     context = {
         'profile': profile,
-        'password_form': password_form
+        'password_form': password_form,
+        # الصورة الافتراضية في حال قام المستخدم بإزالة صورته
+        'default_avatar_url': static('images/default_avatar.png') 
     }
     return render(request, 'students/student_settings.html', context)
+
+
+
+
+
 
 
 

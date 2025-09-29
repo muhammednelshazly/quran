@@ -3,22 +3,15 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.templatetags.static import static
 
-
-
-
-
-
-
+# ==============================================================================
+# Models الأساسية (Halaqa, Surah, Profile)
+# ==============================================================================
 
 class Halaqa(models.Model):
-
-    juz_from = models.PositiveSmallIntegerField(null=True, blank=True)
-    juz_to   = models.PositiveSmallIntegerField(null=True, blank=True)
-
     """حلقة تحفيظ: يشارك فيها طلاب، ويشرف عليها معلم/أكثر."""
     name = models.CharField(max_length=150, unique=True)
-
-    # المعلمين المربوطين بالحَلَقة (توزيع من الأدمن)
+    juz_from = models.PositiveSmallIntegerField(null=True, blank=True)
+    juz_to = models.PositiveSmallIntegerField(null=True, blank=True)
     teachers = models.ManyToManyField(
         "Profile",
         related_name="halaqat_as_teacher",
@@ -29,13 +22,11 @@ class Halaqa(models.Model):
     def __str__(self):
         return self.name
 
-
-
-
 class Surah(models.Model):
+    """موديل لتخزين معلومات السور لتجنب الأخطاء الإملائية."""
     name = models.CharField(max_length=64, unique=True)
-    juz_from = models.PositiveSmallIntegerField()  # أول جزء للسورة (تقريبي إداري)
-    juz_to   = models.PositiveSmallIntegerField()  # آخر جزء للسورة
+    juz_from = models.PositiveSmallIntegerField()
+    juz_to = models.PositiveSmallIntegerField()
 
     class Meta:
         ordering = ["id"]
@@ -43,24 +34,15 @@ class Surah(models.Model):
     def __str__(self):
         return self.name
 
-
-
 class Profile(models.Model):
     """بروفايل المستخدم (طالب/معلّم)."""
-
     ROLE_STUDENT = "student"
     ROLE_TEACHER = "teacher"
-    ROLE_CHOICES = (
-        (ROLE_STUDENT, "Student"),
-        (ROLE_TEACHER, "Teacher"),
-    )
+    ROLE_CHOICES = ((ROLE_STUDENT, "Student"), (ROLE_TEACHER, "Teacher"))
 
     GENDER_MALE = "male"
     GENDER_FEMALE = "female"
-    GENDER_CHOICES = (
-        (GENDER_MALE, "Male"),
-        (GENDER_FEMALE, "Female"),
-    )
+    GENDER_CHOICES = ((GENDER_MALE, "Male"), (GENDER_FEMALE, "Female"))
 
     TEACHER_PENDING = "pending"
     TEACHER_APPROVED = "approved"
@@ -73,36 +55,20 @@ class Profile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=ROLE_STUDENT)
-
-    # الطالب: يرتبط بحلقة واحدة
     halaqa = models.ForeignKey(
-        Halaqa,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="students",
+        Halaqa, null=True, blank=True, on_delete=models.SET_NULL, related_name="students"
     )
-
-    # بيانات إضافية
     gender = models.CharField(max_length=6, choices=GENDER_CHOICES, null=True, blank=True)
     photo = models.ImageField(upload_to="avatars/", null=True, blank=True)
-
     birth_date = models.DateField(null=True, blank=True)
     guardian_phone = models.CharField(max_length=30, null=True, blank=True)
-
-    # بيانات خاصة بالمعلم
     institution = models.CharField(max_length=255, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     certificate = models.FileField(upload_to="certificates/", null=True, blank=True)
-
-
     email_notifications = models.BooleanField(default=True)
     app_notifications = models.BooleanField(default=True)
-
     teacher_status = models.CharField(
-        max_length=10,
-        choices=TEACHER_STATUS_CHOICES,
-        default=TEACHER_PENDING,
+        max_length=10, choices=TEACHER_STATUS_CHOICES, default=TEACHER_PENDING
     )
 
     def __str__(self):
@@ -120,7 +86,6 @@ class Profile(models.Model):
         return static(default_path)
 
     def clean(self):
-        """لو المستخدم طالب: اجبر teacher_status = approved."""
         super().clean()
         if self.role != self.ROLE_TEACHER:
             self.teacher_status = self.TEACHER_APPROVED
@@ -129,136 +94,126 @@ class Profile(models.Model):
         self.full_clean()
         return super().save(*args, **kwargs)
 
+# ==============================================================================
+# Abstract Base Classes (للمهام والتسليمات لتقليل التكرار)
+# ==============================================================================
 
-class Recitation(models.Model):
-    """مهمة تسميع جديدة ينشئها المعلّم."""
+class BaseTask(models.Model):
+    """موديل أساسي مجرد يحتوي على الحقول المشتركة للمهام."""
+    created_by = models.ForeignKey(
+        Profile,
+        on_delete=models.PROTECT,
+        limit_choices_to={"role": Profile.ROLE_TEACHER},
+    )
+    surah = models.ForeignKey(Surah, on_delete=models.PROTECT, verbose_name="السورة")
+    start_ayah = models.PositiveIntegerField("من آية", blank=True, null=True)
+    end_ayah = models.PositiveIntegerField("إلى آية", blank=True, null=True)
+    deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        ordering = ["-deadline", "-id"]
+
+class BaseSubmission(models.Model):
+    """موديل أساسي مجرد يحتوي على الحقول المشتركة للتسليمات."""
+    STATUS_CHOICES = [
+        ("submitted", "تم التسليم"),
+        ("reviewing", "قيد المراجعة"),
+        ("graded", "تم التصحيح"),
+    ]
+    student = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": Profile.ROLE_STUDENT},
+    )
+    audio = models.FileField(upload_to="submissions/", null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="submitted")
+    score = models.PositiveSmallIntegerField(null=True, blank=True)
+    rules = models.PositiveSmallIntegerField(null=True, blank=True)
+    hifdh = models.PositiveSmallIntegerField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+        ordering = ["-created_at"]
+
+# ==============================================================================
+# Models الخاصة بالمهام (Recitation, Review)
+# ==============================================================================
+
+class Recitation(BaseTask):
+    """مهمة تسميع جديدة يرث حقوله من BaseTask."""
     halaqa = models.ForeignKey(Halaqa, on_delete=models.CASCADE, related_name="recitations")
     created_by = models.ForeignKey(
         Profile,
         on_delete=models.PROTECT,
         related_name="created_recitations",
-        limit_choices_to={"role": "teacher"},
+        limit_choices_to={"role": Profile.ROLE_TEACHER},
     )
     
-    # تم دمج الحقول المكررة وإزالة range_text لأنه يمكن حسابه تلقائياً
-    surah = models.CharField("اسم السورة", max_length=100)
-    start_ayah = models.PositiveIntegerField("من آية", blank=True, null=True)
-    end_ayah = models.PositiveIntegerField("إلى آية", blank=True, null=True)
-    deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
-
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-id"]
-
     def __str__(self):
-        return f"{self.surah} (من {self.start_ayah} إلى {self.end_ayah}) – {self.halaqa.name}"
+        return f"تسميع {self.surah.name} (من {self.start_ayah} إلى {self.end_ayah}) – {self.halaqa.name}"
 
-
-
-class RecitationSubmission(models.Model):
-    """تسليم الطالب لمهمة تسميع."""
-
-    STATUS_CHOICES = [
-        ("submitted", "تم التسليم"),
-        ("reviewing", "قيد المراجعة"),
-        ("graded", "متصحّح"),
-    ]
-
-    recitation = models.ForeignKey(Recitation, on_delete=models.CASCADE, related_name="submissions")
-    student = models.ForeignKey(
-        Profile,
-        on_delete=models.CASCADE,
-        related_name="recitation_submissions",
-        limit_choices_to={"role": "student"},
-    )
-    audio = models.FileField(upload_to="recitations/", null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="submitted")
-
-    score = models.PositiveSmallIntegerField(null=True, blank=True)
-    rules = models.PositiveSmallIntegerField(null=True, blank=True)
-    hifdh = models.PositiveSmallIntegerField(null=True, blank=True)
-    notes = models.TextField(null=True, blank=True)
-
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ("recitation", "student")
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"{self.student.user.username} → {self.recitation}"
-
-
-class Review(models.Model):
-    """مهمة مراجعة ينشئها المعلّم."""
-
+class Review(BaseTask):
+    """مهمة مراجعة جديدة ترث حقولها من BaseTask."""
     halaqa = models.ForeignKey(Halaqa, on_delete=models.CASCADE, related_name="reviews")
     created_by = models.ForeignKey(
         Profile,
         on_delete=models.PROTECT,
         related_name="created_reviews",
-        limit_choices_to={"role": "teacher"},
+        limit_choices_to={"role": Profile.ROLE_TEACHER},
+    )
+    
+    def __str__(self):
+        return f"مراجعة {self.surah.name} – {self.halaqa.name}"
+
+# ==============================================================================
+# Models الخاصة بالتسليمات (Submissions)
+# ==============================================================================
+
+class RecitationSubmission(BaseSubmission):
+    """تسليم الطالب لمهمة تسميع."""
+    recitation = models.ForeignKey(Recitation, on_delete=models.CASCADE, related_name="submissions")
+    student = models.ForeignKey(
+        Profile,
+        on_delete=models.CASCADE,
+        related_name="recitation_submissions",
+        limit_choices_to={"role": Profile.ROLE_STUDENT},
     )
 
-    # --- بداية التعديلات ---
-    surah = models.CharField("اسم السورة", max_length=100)
-    start_ayah = models.PositiveIntegerField("من آية", blank=True, null=True)
-    end_ayah = models.PositiveIntegerField("إلى آية", blank=True, null=True)
-    deadline = models.DateTimeField("الموعد النهائي", null=True, blank=True)
-    # --- نهاية التعديلات (تم حذف range_text) ---
-
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-id"]
-
+    class Meta(BaseSubmission.Meta):
+        unique_together = ("recitation", "student")
+        
     def __str__(self):
-        return f"مراجعة {self.surah} – {self.halaqa.name}"
+        return f"{self.student.user.username} → {self.recitation}"
 
-
-class ReviewSubmission(models.Model):
+class ReviewSubmission(BaseSubmission):
     """تسليم الطالب لمهمة مراجعة."""
-
-    STATUS_CHOICES = [
-        ("submitted", "تم التسليم"),
-        ("reviewing", "قيد المراجعة"),
-        ("graded", "متصحّح"),
-    ]
-
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name="submissions")
     student = models.ForeignKey(
         Profile,
         on_delete=models.CASCADE,
         related_name="review_submissions",
-        limit_choices_to={"role": "student"},
+        limit_choices_to={"role": Profile.ROLE_STUDENT},
     )
-    audio = models.FileField(upload_to="reviews/", null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="submitted")
 
-    score = models.PositiveSmallIntegerField(null=True, blank=True)
-    rules = models.PositiveSmallIntegerField(null=True, blank=True)
-    hifdh = models.PositiveSmallIntegerField(null=True, blank=True)
-    notes = models.TextField(null=True, blank=True)
-
-    created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
+    class Meta(BaseSubmission.Meta):
         unique_together = ("review", "student")
-        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.student.user.username} → {self.review}"
 
+# ==============================================================================
+# Models المساعدة (Attendance, Notification)
+# ==============================================================================
 
 class Attendance(models.Model):
+    """موديل تسجيل الحضور والغياب."""
     STATUS_CHOICES = [("present","حاضر"),("absent","غائب"),("late","متأخر")]
-    student = models.ForeignKey(Profile, on_delete=models.CASCADE,
-                               limit_choices_to={"role": Profile.ROLE_STUDENT})
+    student = models.ForeignKey(Profile, on_delete=models.CASCADE, limit_choices_to={"role": Profile.ROLE_STUDENT})
     date = models.DateField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="present")
 
@@ -266,13 +221,12 @@ class Attendance(models.Model):
         unique_together = ("student","date")
         ordering = ["-date"]
 
-
-
 class Notification(models.Model):
-    recipient = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="notifications") # المستلم
+    """موديل الإشعارات."""
+    recipient = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="notifications")
     title = models.CharField(max_length=255)
     message = models.TextField()
-    is_read = models.BooleanField(default=False) # لمعرفة هل قرأه الطالب أم لا
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
