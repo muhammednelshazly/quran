@@ -206,173 +206,143 @@
 </div>
 {% endblock %}
 
-
 {% block extra_js %}
 {{ block.super }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const sendNotificationModal = document.getElementById('sendNotificationModal');
-    const sendNotificationForm = document.getElementById('sendNotificationForm');
+  const addTaskModal = document.getElementById('addTaskModal');
+  const profileModal = document.getElementById('studentProfileModal');
+  const sendNotificationModal = document.getElementById('sendNotificationModal');
+  const sendNotificationForm = document.getElementById('sendNotificationForm');
 
-    // Open Notification Modal
-    document.querySelector('.js-send-notification-btn')?.addEventListener('click', (e) => {
-        e.preventDefault(); 
-        if (sendNotificationModal) {
-            openModal(sendNotificationModal); // Uses global openModal function
-        }
-    });
+  // 1) زر "إرسال إشعار"
+  document.querySelector('.js-send-notification-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openModal(sendNotificationModal);
+  });
 
-    // Send Notification Form via AJAX
-    sendNotificationForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const url = form.action;
-        const data = Object.fromEntries(new FormData(form).entries());
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
-                body: JSON.stringify(data),
-            });
-            const result = await response.json();
-            
-            if (response.ok) {
-                closeModal(); // Uses global closeModal function
-                showSuccess(result.message || 'تم إرسال الإشعار بنجاح!');
-            } else {
-                showError(result.message || 'فشل إرسال الإشعار.');
-            }
-        } catch (error) {
-            console.error('Error sending notification:', error);
-            showError('حدث خطأ في الشبكة. يرجى المحاولة مرة أخرى.');
-        }
-    });
-
-    // General page-specific logic
-    const addTaskModal = document.getElementById('addTaskModal');
-    const profileModal = document.getElementById('studentProfileModal');
-
-    if (!addTaskModal) {
-        console.error('Modal #addTaskModal is not in the page.');
-        return;
+  // إرسال الإشعار عبر AJAX
+  sendNotificationForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const url = form.action;
+    const data = Object.fromEntries(new FormData(form).entries());
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        body: JSON.stringify(data),
+      });
+      const json = await resp.json();
+      if (resp.ok) {
+        closeModal();
+        showSuccess(json.message || 'تم إرسال الإشعار بنجاح!');
+      } else {
+        showError(json.message || 'فشل إرسال الإشعار.');
+      }
+    } catch {
+      showError('حدث خطأ في الشبكة.');
     }
-    
-    const getCsrf = () => document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-    const showSuccess = (msg) => Swal.fire('تم', msg || 'تمت العملية بنجاح.', 'success');
-    const showError   = (msg) => Swal.fire('خطأ', msg || 'حدث خطأ غير متوقع.', 'error');
+  });
 
-    // Event Delegation for action buttons
-    document.addEventListener('click', function(event) {
-        const button = event.target.closest('button');
-        if (!button) return;
+  // 2) تفويض أزرار الإجراءات في جدول الطلاب + زر إضافة مهمة للحلقة
+  document.addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('button');
+    if (!btn) return;
 
-        // Add task for the whole Halaqa
-        if (button.classList.contains('js-add-halaqa-task')) {
-            const halaqaId = button.dataset.halaqaId;
-            const halaqaName = button.dataset.halaqaName;
-            const form = addTaskModal.querySelector('form');
-            form.action = "{% url 'accounts:add_halaqa_task' %}";
-            addTaskModal.querySelector('#modal-halaqa-name').textContent = halaqaName;
-            addTaskModal.querySelector('#task-halaqa-id').value = halaqaId;
-            addTaskModal.querySelector('#task-student-id').value = '';
-            loadSurahsForHalaqa(halaqaId, addTaskModal);
-            openModal(addTaskModal);
-        }
+    // أ) إضافة مهمة للحلقة بالكامل
+    if (btn.classList.contains('js-add-halaqa-task') && addTaskModal) {
+      const halaqaId = btn.dataset.halaqaId;
+      const halaqaName = btn.dataset.halaqaName;
+      const form = addTaskModal.querySelector('form');
+      form.reset();
+      form.action = "{% url 'accounts:add_halaqa_task' %}";
+      addTaskModal.querySelector('#modal-halaqa-name').textContent = halaqaName;
+      addTaskModal.querySelector('#task-halaqa-id').value = halaqaId;
+      addTaskModal.querySelector('#task-student-id').value = '';
+      await loadSurahsForHalaqa(halaqaId);
+      openModal(addTaskModal);
+    }
 
-        // Add task for a specific student
-        if (button.classList.contains('js-add-student-task')) {
-            const studentId = button.dataset.studentId;
-            const studentName = button.dataset.studentName;
-            const halaqaId = button.dataset.halaqaId;
-            const form = addTaskModal.querySelector('form');
-            form.action = "{% url 'accounts:add_student_task' %}";
-            addTaskModal.querySelector('#modal-halaqa-name').textContent = `مهمة لـ: ${studentName}`;
-            addTaskModal.querySelector('#task-halaqa-id').value = halaqaId;
-            addTaskModal.querySelector('#task-student-id').value = studentId;
-            loadSurahsForHalaqa(halaqaId, addTaskModal);
-            openModal(addTaskModal);
-        }
+    // ب) إضافة مهمة لطالب محدّد
+    if (btn.classList.contains('js-add-student-task') && addTaskModal) {
+      const studentId = btn.dataset.studentId;
+      const studentName = btn.dataset.studentName;
+      const halaqaId = btn.dataset.halaqaId;
+      const form = addTaskModal.querySelector('form');
+      form.reset();
+      form.action = "{% url 'accounts:add_student_task' %}";
+      addTaskModal.querySelector('#modal-halaqa-name').textContent = `مهمة لـ: ${studentName}`;
+      addTaskModal.querySelector('#task-halaqa-id').value = halaqaId;
+      addTaskModal.querySelector('#task-student-id').value = studentId;
+      await loadSurahsForHalaqa(halaqaId);
+      openModal(addTaskModal);
+    }
 
-        // View student profile
-        if (button.classList.contains('js-view-profile')) {
-            if (!profileModal) return;
-            const data = button.dataset;
-            profileModal.querySelector('#modal-profile-avatar').src = data.avatar || '';
-            profileModal.querySelector('#modal-profile-name').textContent = data.name || '';
-            profileModal.querySelector('#modal-profile-halaqa').textContent = data.halaqa || '';
-            profileModal.querySelector('#modal-profile-phone').textContent = data.phone || '';
-            profileModal.querySelector('#modal-profile-joined').textContent = data.joined || '';
-            profileModal.querySelector('#modal-profile-age').textContent = data.age || '';
-            openModal(profileModal);
-        }
+    // ج) عرض الملف الشخصي
+    if (btn.classList.contains('js-view-profile') && profileModal) {
+      const d = btn.dataset;
+      profileModal.querySelector('#modal-profile-avatar').src = d.avatar || '';
+      profileModal.querySelector('#modal-profile-name').textContent = d.name || '';
+      profileModal.querySelector('#modal-profile-halaqa').textContent = d.halaqa || '';
+      profileModal.querySelector('#modal-profile-phone').textContent = d.phone || '';
+      profileModal.querySelector('#modal-profile-joined').textContent = d.joined || '';
+      profileModal.querySelector('#modal-profile-age').textContent = d.age || '';
+      openModal(profileModal);
+    }
 
-        // Delete student from Halaqa
-        if (button.classList.contains('js-delete-student')) {
-            const studentId = button.dataset.studentId;
-            const studentName = button.dataset.studentName;
-            const url = `/accounts/student/${studentId}/unassign/`;
-
-            Swal.fire({
-                title: 'هل أنت متأكد؟',
-                text: `سيتم إزالة الطالب (${studentName}) من هذه الحلقة. لن يتم حذف الطالب نهائيًا.`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#386641',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'نعم، قم بالإزالة',
-                cancelButtonText: 'إلغاء'
-            }).then(async (result) => {
-                if (!result.isConfirmed) return;
-                try {
-                    const resp = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': getCsrf() }
-                    });
-                    const data = await resp.json();
-                    if (data.status === 'success') {
-                        const row = button.closest('tr');
-                        if (row) {
-                            row.style.transition = 'opacity 0.5s ease';
-                            row.style.opacity = '0';
-                            setTimeout(() => row.remove(), 500);
-                        }
-                        showSuccess('تمت إزالة الطالب من الحلقة.');
-                    } else {
-                        showError(data.message);
-                    }
-                } catch (_) {
-                    showError('حدث خطأ في الشبكة.');
-                }
-            });
-        }
-    });
-
-    // AJAX form submission for the Add Task modal
-    const addTaskForm = addTaskModal?.querySelector('form');
-    if (addTaskForm) {
-        addTaskForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const body = new FormData(addTaskForm);
-            try {
-                const resp = await fetch(addTaskForm.action, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': getCsrf() },
-                    body
-                });
-                const data = await resp.json();
-                if (data.status === 'success') {
-                    closeModal();
-                    await showSuccess(data.message || 'تم إضافة المهمة بنجاح.');
-                    location.reload();
-                } else {
-                    showError(data.message || 'تعذّر إضافة المهمة.');
-                }
-            } catch (err) {
-                showError('حدث خطأ في الشبكة.');
-            }
+    // د) حذف طالب من الحلقة
+    if (btn.classList.contains('js-delete-student')) {
+      const studentId = btn.dataset.studentId;
+      const studentName = btn.dataset.studentName;
+      const url = `/accounts/student/${studentId}/unassign/`;
+      if (window.Swal) {
+        const res = await Swal.fire({
+          title: 'هل أنت متأكد؟',
+          text: `سيتم إزالة الطالب (${studentName}) من هذه الحلقة.`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#386641',
+          cancelButtonColor: '#d33',
+          confirmButtonText: 'نعم، قم بالإزالة',
+          cancelButtonText: 'إلغاء'
         });
+        if (!res.isConfirmed) return;
+      } else if (!confirm('تأكيد الإزالة؟')) {
+        return;
+      }
+      try {
+        const r = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': getCsrf() } });
+        const j = await r.json();
+        if (j.status === 'success') {
+          const row = btn.closest('tr');
+          if (row) { row.style.transition = 'opacity .5s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 500); }
+          showSuccess('تمت إزالة الطالب من الحلقة.');
+        } else {
+          showError(j.message);
+        }
+      } catch { showError('حدث خطأ في الشبكة.'); }
     }
+  });
+
+  // 3) إرسال فورم إضافة المهمة (AJAX)
+  const addTaskForm = addTaskModal?.querySelector('form');
+  addTaskForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = new FormData(addTaskForm);
+    try {
+      const resp = await fetch(addTaskForm.action, { method: 'POST', headers: { 'X-CSRFToken': getCsrf() }, body });
+      const data = await resp.json();
+      if (data.status === 'success') {
+        closeModal();
+        await showSuccess(data.message || 'تم إضافة المهمة بنجاح.');
+        location.reload();
+      } else {
+        showError(data.message || 'تعذّر إضافة المهمة.');
+      }
+    } catch { showError('حدث خطأ في الشبكة.'); }
+  });
 });
 </script>
+
 {% endblock %}

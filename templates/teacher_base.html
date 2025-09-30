@@ -164,159 +164,125 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     {% block extra_js %}
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+    /* =========================
+    1) دوال عامة (GLOBAL)
+    ========================= */
+    window.getCsrf = () =>
+    document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+    window.showSuccess = (msg) => {
+    if (window.Swal) return Swal.fire('تم', msg || 'تمت العملية بنجاح.', 'success');
+    alert(msg || 'تمت العملية بنجاح.');
+    };
+    window.showError = (msg) => {
+    if (window.Swal) return Swal.fire('خطأ', msg || 'حدث خطأ غير متوقع.', 'error');
+    alert(msg || 'حدث خطأ غير متوقع.');
+    };
+
+    // Modal controls (GLOBAL)
+    (function () {
+    const body = document.body;
+    let activeModal = null;
+
+    window.openModal = (modalElement) => {
+        if (!modalElement) return;
+        activeModal = modalElement;
+        activeModal.classList.add('is-visible');
+        body.classList.add('modal-open');
+    };
+
+    window.closeModal = () => {
+        if (!activeModal) return;
+        const form = activeModal.querySelector('form');
+        if (form) form.reset();
+        activeModal.classList.remove('is-visible');
+        body.classList.remove('modal-open');
+        activeModal = null;
+    };
+
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('.js-close-modal')) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && activeModal) closeModal();
+    });
+    })();
+
+    // تحميل السور إلى الـ<select id="surah-select"> (GLOBAL)
+    window.loadSurahsForHalaqa = async (halaqaId) => {
+    const sel = document.getElementById('surah-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">جاري تحميل السور...</option>';
+    sel.disabled = true;
+    try {
+        const resp = await fetch(`/accounts/api/halaqa/${halaqaId}/surahs/`);
+        const data = await resp.json();
+        sel.innerHTML = '<option value="" disabled selected>اختر السورة</option>';
+        (data.surahs || []).forEach(s => sel.add(new Option(s.name, s.id))); // value=id
+        sel.disabled = false;
+    } catch (e) {
+        console.error(e);
+        sel.innerHTML = '<option value="">فشل تحميل السور</option>';
+    }
+    };
+
+    /* =========================
+    2) بقية سكربت القالب (داخلي)
+    ========================= */
     document.addEventListener('DOMContentLoaded', function () {
-        // =========================================================================
-        // SECTION 1: الكود الأصلي الخاص بك (النوافذ المنبثقة + الوضع الليلي)
-        // =========================================================================
-
-        // --- دوال النافذة المنبثقة العامة ---
-        let activeModal = null;
-        const body = document.body;
-        const openModal = (modalElement) => {
-            if (!modalElement) return;
-            activeModal = modalElement;
-            activeModal.classList.add('is-visible');
-            body.classList.add('modal-open');
-        };
-        const closeModal = () => {
-            if (!activeModal) return;
-            const form = activeModal.querySelector('form');
-            if(form) form.reset();
-            activeModal.classList.remove('is-visible');
-            body.classList.remove('modal-open');
-            activeModal = null;
-        };
-        document.addEventListener('click', function(event) {
-            if (event.target.closest('.js-close-modal')) {
-                closeModal();
-            }
+    // Dark mode toggle (كما هو)
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        const themeIcon = document.getElementById('theme-icon');
+        if (localStorage.getItem('theme') === 'dark' ||
+            (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        if (themeIcon) themeIcon.textContent = 'light_mode';
+        } else {
+        if (themeIcon) themeIcon.textContent = 'dark_mode';
+        }
+        themeToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        if (document.documentElement.classList.contains('dark')) {
+            localStorage.setItem('theme', 'dark');
+            if (themeIcon) themeIcon.textContent = 'light_mode';
+        } else {
+            localStorage.setItem('theme', 'light');
+            if (themeIcon) themeIcon.textContent = 'dark_mode';
+        }
         });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && activeModal) {
-                closeModal();
-            }
+    }
+
+    // Sidebar (كما هو)
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    function openSidebar() {
+        if (sidebar && sidebarOverlay) {
+        sidebar.classList.remove('translate-x-full');
+        sidebarOverlay.classList.remove('hidden');
+        }
+    }
+    function closeSidebar() {
+        if (sidebar && sidebarOverlay) {
+        sidebar.classList.add('translate-x-full');
+        sidebarOverlay.classList.add('hidden');
+        }
+    }
+    if (menuToggle) {
+        menuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (sidebar.classList.contains('translate-x-full')) openSidebar();
+        else closeSidebar();
         });
-
-        // --- دوال JavaScript المخصصة لتشغيل نافذة "إضافة مهمة" ---
-        const loadSurahsForHalaqa = async (halaqaId, modalElement) => {
-            const surahSelect = modalElement.querySelector('#surah-select');
-            if (!surahSelect) return;
-            
-            surahSelect.innerHTML = '<option value="">جاري تحميل السور...</option>';
-            surahSelect.disabled = true;
-            try {
-                const response = await fetch(`/accounts/api/halaqa/${halaqaId}/surahs/`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-                surahSelect.innerHTML = '<option value="" disabled selected>اختر السورة</option>';
-                data.surahs.forEach(surah => {
-                    const option = new Option(surah.name, surah.id);
-                    surahSelect.add(option);
-                });
-                surahSelect.disabled = false;
-            } catch (error) {
-                console.error('Failed to load surahs:', error);
-                surahSelect.innerHTML = '<option value="">فشل تحميل السور</option>';
-            }
-        };
-        
-        window.openAddTaskModal = (halaqaId, halaqaName) => {
-            const modalElement = document.getElementById('addTaskModal');
-            if (!modalElement) {
-                console.error('Add Task Modal not found!');
-                return;
-            }
-            modalElement.querySelector('#task-halaqa-id').value = halaqaId;
-            modalElement.querySelector('#modal-halaqa-name').textContent = halaqaName;
-            loadSurahsForHalaqa(halaqaId, modalElement);
-            openModal(modalElement);
-        };
-
-        const modal = document.getElementById('addTaskModal');
-        if(modal) {
-            const recitationBtn = modal.querySelector('#recitation-btn');
-            const reviewBtn = modal.querySelector('#review-btn');
-            const taskTypeInput = modal.querySelector('#task-type-input');
-            const activeClasses = "task-type-btn w-1/2 py-2.5 px-4 rounded-md font-bold text-sm transition-all duration-300 bg-card dark:bg-card-dark text-primary dark:text-success shadow-sm";
-            const inactiveClasses = "task-type-btn w-1/2 py-2.5 px-4 rounded-md font-bold text-sm transition-all duration-300 text-text-secondary dark:text-text-secondary-dark";
-
-            if (recitationBtn) {
-                recitationBtn.addEventListener('click', () => {
-                    taskTypeInput.value = 'recitation';
-                    recitationBtn.className = activeClasses;
-                    reviewBtn.className = inactiveClasses;
-                });
-            }
-            if (reviewBtn) {
-                reviewBtn.addEventListener('click', () => {
-                    taskTypeInput.value = 'review';
-                    reviewBtn.className = activeClasses;
-                    recitationBtn.className = inactiveClasses;
-                });
-            }
-        }
-
-        // --- كود الـ Dark Mode ---
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-            const themeIcon = document.getElementById('theme-icon');
-            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-                if (themeIcon) themeIcon.textContent = 'light_mode';
-            } else {
-                if (themeIcon) themeIcon.textContent = 'dark_mode';
-            }
-
-            themeToggle.addEventListener('click', () => {
-                document.documentElement.classList.toggle('dark');
-                if (document.documentElement.classList.contains('dark')) {
-                    localStorage.setItem('theme', 'dark');
-                    if (themeIcon) themeIcon.textContent = 'light_mode';
-                } else {
-                    localStorage.setItem('theme', 'light');
-                    if (themeIcon) themeIcon.textContent = 'dark_mode';
-                }
-            });
-        }
-        
-        // =========================================================================
-        // SECTION 2: الكود الجديد الخاص بالقائمة الجانبية المتجاوبة
-        // =========================================================================
-        const sidebar = document.getElementById('sidebar');
-        const menuToggle = document.getElementById('menu-toggle');
-        const sidebarOverlay = document.getElementById('sidebar-overlay');
-
-        function openSidebar() {
-            if (sidebar && sidebarOverlay) {
-                sidebar.classList.remove('translate-x-full');
-                sidebarOverlay.classList.remove('hidden');
-            }
-        }
-
-        function closeSidebar() {
-            if (sidebar && sidebarOverlay) {
-                sidebar.classList.add('translate-x-full');
-                sidebarOverlay.classList.add('hidden');
-            }
-        }
-
-        if (menuToggle) {
-            menuToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (sidebar.classList.contains('translate-x-full')) {
-                    openSidebar();
-                } else {
-                    closeSidebar();
-                }
-            });
-        }
-
-        if (sidebarOverlay) {
-            sidebarOverlay.addEventListener('click', closeSidebar);
-        }
+    }
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
     });
     </script>
     {% endblock %}
+
 </body>
 </html>

@@ -5,7 +5,6 @@
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <title>منصة آية - لوحة تحكم الطالب</title>
-    <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
 
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -49,7 +48,7 @@
         .details-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; }
         .details-content.open { max-height: 500px; transition: max-height 0.5s ease-in-out; }
         .rotate-180 { transform: rotate(180deg); }
-        .animated-card { animation: fade-in-up 0.5s ease-out forwards; }
+        .animated-card { opacity: 0; animation: fade-in-up 0.5s ease-out forwards; }
         .animate-delay-100 { animation-delay: 100ms; } .animate-delay-200 { animation-delay: 200ms; }
         .animate-delay-300 { animation-delay: 300ms; } .animate-delay-400 { animation-delay: 400ms; }
         .tab-button, .task-filter-btn {
@@ -122,6 +121,7 @@
                             </div>
                         </div>
                     </section>
+                    
                     <section class="animated-card animate-delay-200">
                         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
                             <h3 class="text-xl font-bold">مهامك الدراسية</h3>
@@ -131,6 +131,7 @@
                                 <button class="task-filter-btn" data-filter="review">مراجعة</button>
                             </div>
                         </div>
+                        
                         <div class="flex flex-col sm:flex-row items-center justify-between mb-4 gap-2">
                             <div class="flex items-center rounded-lg bg-background dark:bg-background-dark p-1 shadow-inner">
                                 <button class="tab-button active" data-tab-target="#pending">مطلوبة</button>
@@ -151,7 +152,6 @@
                                 </div>
                             </div>
                         </div>
-                        
                         <div class="space-y-3">
                             <div id="pending" class="tab-content active space-y-3" data-tab-content>
                                 {% for task in pending_tasks %}{% include 'students/partials/_task_item.html' with task=task sub=task.sub %}{% empty %}<div class="empty-state text-center text-text-secondary dark:text-text-secondary-dark p-6 bg-card dark:bg-card-dark rounded-xl border border-dashed"><p>لا توجد مهام مطلوبة حاليًا. عمل رائع!</p></div>{% endfor %}
@@ -165,7 +165,7 @@
                         </div>
                     </section>
                 </div>
-
+                
                 <div class="lg:col-span-1 space-y-8">
                     <section class="animated-card animate-delay-300">
                         <h3 class="text-xl font-bold mb-4">إحصائيات عامة</h3>
@@ -216,7 +216,7 @@
     </main>
 </div>
 
-<div id="profile-modal" class="fixed inset-0 z-50 hidden items-start justify-center pt-24 bg-black/50 backdrop-blur-sm p-4 transition-opacity duration-300">
+<div id="profile-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4 transition-opacity duration-300 opacity-0">
     <div id="profile-modal-content" class="bg-card dark:bg-card-dark rounded-2xl shadow-lifted w-full max-w-sm p-8 text-center relative transform transition-all duration-300 scale-95 opacity-0">
         <button id="profile-close-button" class="absolute top-4 right-4 rounded-full p-1.5 text-text-secondary dark:text-text-secondary-dark hover:bg-gray-100 dark:hover:bg-gray-700">
             <span class="material-symbols-outlined">close</span>
@@ -243,49 +243,81 @@
 </div>
 
 <div id="rec-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-card dark:bg-card-dark rounded-xl shadow-lifted w-full max-w-md p-8 text-center relative animate-fade-in-up" style="animation-duration: 0.3s;">
+        <button id="rec-close" class="absolute top-4 left-4 rounded-full p-1.5 text-text-secondary dark:text-text-secondary-dark hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="إغلاق">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-text-primary dark:text-text-primary-dark mb-2" id="rec-title">تسجيل التلاوة</h2>
+            <p class="text-text-secondary dark:text-text-secondary-dark">اضغط على زر البدء عندما تكون مستعدًا.</p>
+        </div>
+        <div class="relative mb-6">
+            <div class="w-24 h-24 bg-primary/10 dark:bg-success/20 rounded-full mx-auto flex items-center justify-center">
+                <div class="w-16 h-16 bg-primary/20 dark:bg-success/30 rounded-full flex items-center justify-center">
+                    <span class="material-symbols-outlined text-4xl text-primary dark:text-success" id="mic-icon">mic</span>
+                </div>
+            </div>
+            <p id="rec-timer" class="mt-3 text-sm text-text-secondary dark:text-text-secondary-dark">00:00</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <button id="rec-start" class="col-span-2 flex items-center justify-center gap-2 w-full bg-primary text-white font-bold py-3 px-4 rounded-lg hover:bg-primary/90 transition">
+                <span class="material-symbols-outlined">fiber_manual_record</span><span>بدء التسجيل</span>
+            </button>
+            <button id="rec-stop" class="col-span-2 flex items-center justify-center gap-2 w-full bg-danger/10 text-danger font-bold py-3 px-4 rounded-lg hover:bg-danger/20 transition opacity-50 cursor-not-allowed" disabled>
+                <span class="material-symbols-outlined">stop_circle</span><span>إيقاف التسجيل</span>
+            </button>
+        </div>
+        <audio id="rec-audio" class="w-full mb-4" controls hidden></audio>
+        <div class="flex items-center justify-between gap-4">
+            <button id="rec-retry" class="flex items-center justify-center gap-2 w-full bg-gray-100 dark:bg-gray-700 text-text-primary dark:text-text-primary-dark font-bold py-3 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition" disabled>
+                <span class="material-symbols-outlined">replay</span><span>إعادة المحاولة</span>
+            </button>
+            <button id="rec-submit" class="w-full bg-primary/10 dark:bg-success/20 text-primary dark:text-success font-bold py-3 px-4 rounded-lg hover:bg-primary/20 dark:hover:bg-success/30 transition opacity-50 cursor-not-allowed" disabled>
+                <span>تسليم</span>
+            </button>
+        </div>
     </div>
+</div>
+
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Dark Mode, Tabs, Task Expansion, and Recording Modal Logic (No Changes) ---
-    // ... (All previous JS code from the last turn remains here) ...
+    // --- Theme Toggle Logic ---
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
     const applyTheme = (theme) => {
         if (theme === 'dark') {
             document.documentElement.classList.add('dark');
-            if(document.getElementById('theme-icon')) document.getElementById('theme-icon').textContent = 'light_mode';
+            if(themeIcon) themeIcon.textContent = 'light_mode';
         } else {
             document.documentElement.classList.remove('dark');
-            if(document.getElementById('theme-icon')) document.getElementById('theme-icon').textContent = 'dark_mode';
+            if(themeIcon) themeIcon.textContent = 'dark_mode';
         }
     };
     const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     applyTheme(savedTheme);
-    document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    themeToggle?.addEventListener('click', () => {
         const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
         localStorage.setItem('theme', newTheme);
         applyTheme(newTheme);
     });
 
+    // --- Tabs Logic ---
     document.querySelectorAll(".tab-button").forEach(button => {
         button.addEventListener("click", () => {
             document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
             button.classList.add("active");
-            document.querySelectorAll("[data-tab-content]").forEach(content => content.classList.remove("active"));
-            document.querySelector(button.dataset.tabTarget).classList.add("active");
+            document.querySelectorAll("[data-tab-content]").forEach(content => {
+                content.classList.remove("active");
+                content.style.display = 'none';
+            });
+            const activeTab = document.querySelector(button.dataset.tabTarget);
+            activeTab.classList.add("active");
+            activeTab.style.display = 'block';
         });
     });
 
-    document.body.addEventListener('click', event => {
-        const header = event.target.closest('.task-header');
-        if (header) {
-            const details = header.nextElementSibling;
-            if (details && details.classList.contains('details-content')) {
-                details.classList.toggle('open');
-                header.querySelector('.arrow-icon')?.classList.toggle('rotate-180');
-            }
-        }
-    });
-
+    // --- Task Type Filter Logic ---
     document.querySelectorAll('.task-filter-btn').forEach(button => {
         button.addEventListener('click', () => {
             document.querySelectorAll('.task-filter-btn').forEach(btn => btn.classList.remove('active'));
@@ -296,41 +328,44 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     });
-    
-    // --- **START: NEW LOGIC FOR PROFILE MODAL & SORTING** ---
+
+    // --- Task Details Expansion (using event delegation) ---
+    document.body.addEventListener('click', event => {
+        if (event.target.closest('.open-recitation')) return;
+        const header = event.target.closest('.task-header');
+        if (header) {
+            const details = header.nextElementSibling;
+            if (details && details.classList.contains('details-content')) {
+                details.classList.toggle('open');
+                header.querySelector('.arrow-icon')?.classList.toggle('rotate-180');
+            }
+        }
+    });
 
     // --- Profile Modal Logic ---
     const profileButton = document.getElementById('profile-button');
     const profileModal = document.getElementById('profile-modal');
     const profileModalContent = document.getElementById('profile-modal-content');
     const profileCloseButton = document.getElementById('profile-close-button');
-
     const openProfileModal = () => {
-        profileModal.classList.remove('hidden');
+        profileModal.classList.remove('hidden', 'opacity-0');
+        profileModal.classList.add('flex');
         setTimeout(() => {
-            profileModal.classList.add('opacity-100');
             profileModalContent.classList.remove('scale-95', 'opacity-0');
-            profileModalContent.classList.add('scale-100', 'opacity-100');
         }, 10);
     };
-
     const closeProfileModal = () => {
         profileModalContent.classList.add('scale-95', 'opacity-0');
-        profileModal.classList.remove('opacity-100');
         setTimeout(() => {
-            profileModal.classList.add('hidden');
+            profileModal.classList.add('hidden', 'opacity-0');
+            profileModal.classList.remove('flex');
         }, 300);
     };
-
     profileButton?.addEventListener('click', openProfileModal);
     profileCloseButton?.addEventListener('click', closeProfileModal);
-    profileModal?.addEventListener('click', (e) => {
-        if (e.target === profileModal) {
-            closeProfileModal();
-        }
-    });
+    profileModal?.addEventListener('click', (e) => { if (e.target === profileModal) closeProfileModal(); });
 
-    // --- Sorting Dropdown Logic ---
+    // ========= START: Sorting Dropdown Logic =========
     const sortButton = document.getElementById('sort-button');
     const sortMenu = document.getElementById('sort-menu');
     const sortLabel = document.getElementById('sort-label');
@@ -349,7 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const sortType = e.target.dataset.sort;
             sortLabel.textContent = e.target.textContent;
-            
             const activeTabContent = document.querySelector('.tab-content.active');
             if (!activeTabContent) return;
 
@@ -359,28 +393,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 let valA, valB;
                 switch(sortType) {
                     case 'newest':
-                        valA = a.dataset.createdAt;
-                        valB = b.dataset.createdAt;
+                        valA = a.dataset.createdAt; valB = b.dataset.createdAt;
                         return valB.localeCompare(valA); // B vs A for descending
                     case 'oldest':
-                        valA = a.dataset.createdAt;
-                        valB = b.dataset.createdAt;
+                        valA = a.dataset.createdAt; valB = b.dataset.createdAt;
                         return valA.localeCompare(valB); // A vs B for ascending
                     case 'deadline':
-                        valA = a.dataset.deadline;
-                        valB = b.dataset.deadline;
-                        return valA.localeCompare(valB); // Sooner deadlines first
+                        valA = a.dataset.deadline || '9999-12-31T23:59:59+00:00';
+                        valB = b.dataset.deadline || '9999-12-31T23:59:59+00:00';
+                        return valA.localeCompare(valB); // A vs B for ascending
                     default:
                         return 0;
                 }
             });
 
-            // Re-append sorted tasks
+            // Re-append sorted tasks to the DOM
             tasks.forEach(task => activeTabContent.appendChild(task));
         });
     });
-
-    // --- Recording Modal & AJAX Submission (Existing Logic) ---
+    // ========= END: Sorting Dropdown Logic =========
+    
+    // --- Recording Modal & AJAX Submission ---
     const getCookie = name => { let c = `; ${document.cookie}`.split(`; ${name}=`); if (c.length === 2) return c.pop().split(';').shift(); };
     const modal = document.getElementById('rec-modal');
     const recElements = {
@@ -403,7 +436,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const openModal = (title, submitUrl, taskId) => {
         recElements.title.textContent = title || "تسجيل التلاوة";
         currentTaskInfo = { url: submitUrl, id: taskId };
-        // ... (rest of the openModal function is unchanged)
+        recElements.audio.hidden = true; recElements.audio.src = "";
+        recElements.retry.disabled = true;
+        recElements.submit.disabled = true; recElements.submit.classList.add('opacity-50', 'cursor-not-allowed');
+        recElements.stop.disabled = true; recElements.stop.classList.add('opacity-50', 'cursor-not-allowed');
+        recElements.start.disabled = false;
+        recElements.timer.textContent = "00:00"; seconds = 0;
+        recElements.micIcon.textContent = "mic";
+        modal.classList.remove('hidden'); modal.classList.add('flex');
     };
     
     const closeModal = () => {
@@ -422,7 +462,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     recElements.close?.addEventListener('click', closeModal);
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-    // ... (rest of the recording and submission logic is unchanged)
+
+    recElements.start.addEventListener('click', async () => {
+        if (!navigator.mediaDevices?.getUserMedia) { return alert("المتصفح لا يدعم تسجيل الصوت."); }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            chunks = [];
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                recElements.audio.src = URL.createObjectURL(blob);
+                recElements.audio.hidden = false;
+                recElements.retry.disabled = false;
+                recElements.submit.disabled = false; recElements.submit.classList.remove('opacity-50', 'cursor-not-allowed');
+            };
+            mediaRecorder.start();
+            recElements.start.disabled = true;
+            recElements.stop.disabled = false; recElements.stop.classList.remove('opacity-50', 'cursor-not-allowed');
+            recElements.micIcon.textContent = "graphic_eq";
+            seconds = 0; recElements.timer.textContent = "00:00";
+            clearInterval(timerInt);
+            timerInt = setInterval(() => { seconds++; recElements.timer.textContent = formatTime(seconds); }, 1000);
+        } catch (err) { alert("تعذر بدء التسجيل: " + err.message); }
+    });
+
+    recElements.stop.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            clearInterval(timerInt);
+            recElements.stop.disabled = true; recElements.stop.classList.add('opacity-50', 'cursor-not-allowed');
+            recElements.micIcon.textContent = "mic";
+        }
+    });
+
+    recElements.retry.addEventListener('click', () => {
+        recElements.audio.hidden = true; recElements.audio.src = "";
+        recElements.retry.disabled = true;
+        recElements.submit.disabled = true; recElements.submit.classList.add('opacity-50', 'cursor-not-allowed');
+        recElements.start.disabled = false;
+        recElements.timer.textContent = "00:00"; seconds = 0;
+    });
+
     recElements.submit.addEventListener('click', async () => {
         if (!currentTaskInfo.url || chunks.length === 0) return;
         const blob = new Blob(chunks, { type: 'audio/webm' });
@@ -443,29 +524,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 toast: true, position: 'top-start', icon: 'success',
                 title: 'تم تسليم المهمة بنجاح!', showConfirmButton: false, timer: 3000
             });
-            
+
+            // --- Dynamic UI Update ---
             const originalTaskCard = document.getElementById(`task-item-${currentTaskInfo.id}`);
             if(originalTaskCard) {
                 const newCardHTML = data.task_card_html;
                 const submittedTab = document.getElementById('submitted');
-                const pendingTab = document.getElementById('pending');
                 
                 originalTaskCard.remove();
-                
-                submittedTab.querySelector('.empty-state')?.remove();
                 submittedTab.insertAdjacentHTML('afterbegin', newCardHTML);
                 
                 const pendingTasksCountStat = document.getElementById('pending-tasks-count-stat');
                 if (pendingTasksCountStat) {
                     pendingTasksCountStat.textContent = data.new_stats.pending_tasks_count;
                 }
-
-                if (!pendingTab.querySelector('.task-item')) {
-                    const emptyMessage = '<div class="empty-state text-center text-text-secondary dark:text-text-secondary-dark p-6 bg-card dark:bg-card-dark rounded-xl border border-dashed"><p>لا توجد مهام مطلوبة حاليًا. عمل رائع!</p></div>';
-                    pendingTab.innerHTML = emptyMessage;
-                }
             } else {
-               location.reload(); 
+               location.reload(); // Fallback in case card is not found
             }
 
         } catch (err) {

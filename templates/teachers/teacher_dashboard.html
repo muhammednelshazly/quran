@@ -66,12 +66,19 @@
                             <img alt="Student Avatar" class="w-10 h-10 rounded-full object-cover" src="{{ sub.student.avatar_url }}"/>
                             <div>
                                 <p class="font-bold text-text-primary dark:text-text-primary-dark">{{ sub.student.user.username }}</p>
-                                <p class="text-sm text-text-secondary dark:text-text-secondary-dark">{{ sub.recitation }}</p>
+                                <p class="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                    {% if sub.type == 'recitation' %}
+                                        {{ sub.recitation }}
+                                    {% else %}
+                                        {{ sub.review }}
+                                    {% endif %}
+                                </p>
                             </div>
                         </div>
                         <button 
                             class="js-grade-submission bg-primary text-white py-2 px-4 rounded-full text-sm font-bold hover:bg-secondary transition-colors"
-                            data-submission-id="{{ sub.id }}">
+                            data-submission-id="{{ sub.id }}"
+                            data-submission-type="{{ sub.type }}"> {# <-- هذا السطر مهم جداً #}
                             قيّم الآن
                         </button>
                     </li>
@@ -328,20 +335,22 @@ document.addEventListener('DOMContentLoaded', function () {
         
         const gradeButton = event.target.closest('.js-grade-submission');
         if (gradeButton) {
-            const submissionId = gradeButton.dataset.submissionId;
-            currentSubmissionId = submissionId;
+            const submissionId = gradeButton.dataset.submissionId;
+            const submissionType = gradeButton.dataset.submissionType; // <-- جلب النوع
+            currentSubmissionId = submissionId;
 
             const gradeForm = document.getElementById('gradeSubmissionForm');
             const gradeLoader = document.getElementById('modal-loader');
             const gradeContent = document.getElementById('modal-grade-content');
             
-            gradeForm.action = `/accounts/teacher/submission/${submissionId}/grade/`;
+            gradeForm.action = `/accounts/teacher/submission/${submissionType}/${submissionId}/grade/`;
+
             gradeLoader.style.display = 'block';
             gradeContent.classList.add('hidden');
             openModal(gradeModal);
 
             try {
-                const response = await fetch(`/accounts/api/submission/${submissionId}/`);
+                const response = await fetch(`/accounts/api/submission/${submissionType}/${submissionId}/`);
                 if (!response.ok) throw new Error('فشل تحميل البيانات');
                 const data = await response.json();
 

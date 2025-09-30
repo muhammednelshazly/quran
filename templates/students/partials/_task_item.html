@@ -6,8 +6,7 @@
     data-deadline="{{ task.deadline|date:'c'|default:'9999-12-31T23:59:59+00:00' }}"
     data-score="{{ sub.score|default:'-1' }}">
 
-    {# === HEADER === #}
-    <div class="task-header flex items-start justify-between p-4 {% if sub.status == 'graded' and sub.score >= 5 %}cursor-pointer{% endif %}">
+    <div class="task-header flex items-start justify-between p-4 cursor-pointer">
         <div class="flex items-center gap-4">
             <div class="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center 
                 {% if task.type == 'recitation' %}bg-primary/10{% else %}bg-secondary/10{% endif %}">
@@ -23,7 +22,7 @@
                         <span class="material-symbols-outlined text-base">event</span>
                         <span>{{ task.deadline|arabic_timesince }}</span>
                     </div>
-                     <div class="flex items-center gap-1.5" title="أُضيفت بواسطة المعلم">
+                    <div class="flex items-center gap-1.5" title="أُضيفت بواسطة المعلم">
                         <span class="material-symbols-outlined text-base">person</span>
                         <span>{{ task.created_by.user.username }}</span>
                     </div>
@@ -50,11 +49,6 @@
                         <span class="material-symbols-outlined text-base">schedule</span>
                         <span>متأخر</span>
                     </div>
-                {% else %}
-                    <div class="hidden sm:flex items-center gap-1 text-info text-xs font-bold" title="جديد">
-                         <span class="material-symbols-outlined text-base">auto_awesome</span>
-                        <span>جديد</span>
-                    </div>
                 {% endif %}
                 <button class="open-recitation flex items-center justify-center gap-2 rounded-lg bg-primary py-2.5 px-4 text-sm font-bold text-white hover:bg-primary/90 transition"
                     data-task-id="{{ task.id }}"
@@ -62,11 +56,11 @@
                     data-submit-url="{% url 'accounts:submit_task' task_type=task.type task_id=task.id %}">
                     <span>{% if sub %}إعادة المحاولة{% else %}ابدأ{% endif %}</span>
                 </button>
+
             {% endif %}
         </div>
     </div>
-    
-    {# === FEEDBACK FOR FAILED ATTEMPT === #}
+
     {% if sub and sub.status == 'graded' and sub.score < 5 %}
     <div class="border-t border-border-color dark:border-border-color-dark p-4">
         <div class="bg-danger/10 text-danger dark:text-red-400 p-3 rounded-lg text-sm space-y-2">
@@ -80,8 +74,7 @@
         </div>
     </div>
     {% endif %}
-    
-    {# === DETAILS FOR SUCCESSFUL ATTEMPT === #}
+
     {% if sub.status == "graded" and sub.score >= 5 %}
     <div class="details-content" id="details-{{ task.id }}">
         <div class="border-t border-border-color dark:border-border-color-dark p-4 space-y-4">
@@ -89,19 +82,23 @@
                 <div>
                     <span class="font-semibold text-text-secondary dark:text-text-secondary-dark">دقة الحفظ:</span>
                     <div class="flex items-center gap-2 mt-1">
-                        <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-full bg-primary dark:bg-success rounded-full" style="width: {{ sub.hifdh_percentage }}%;"></div></div>
+                        <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary dark:bg-success rounded-full" style="width: {{ sub.hifdh_percentage }}%;"></div>
+                        </div>
                         <span class="font-bold text-primary dark:text-success">{{ sub.hifdh|default:"—" }}/5</span>
                     </div>
                 </div>
                 <div>
                     <span class="font-semibold text-text-secondary dark:text-text-secondary-dark">صحة الأحكام:</span>
                     <div class="flex items-center gap-2 mt-1">
-                        <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"><div class="h-full bg-secondary rounded-full" style="width: {{ sub.rules_percentage }}%;"></div></div>
+                        <div class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-secondary rounded-full" style="width: {{ sub.rules_percentage }}%;"></div>
+                        </div>
                         <span class="font-bold text-secondary">{{ sub.rules|default:"—" }}/5</span>
                     </div>
                 </div>
             </div>
-             <div class="text-xs text-text-secondary dark:text-text-secondary-dark flex flex-wrap gap-x-4 gap-y-1">
+            <div class="text-xs text-text-secondary dark:text-text-secondary-dark flex flex-wrap gap-x-4 gap-y-1">
                 <span><b>تاريخ التسليم:</b> {{ sub.created_at|date:"Y/m/d - H:i" }}</span>
                 <span><b>تاريخ التصحيح:</b> {{ sub.updated_at|date:"Y/m/d - H:i" }}</span>
                 <span><b>المصحح:</b> {{ task.created_by.user.username }}</span>
@@ -109,12 +106,11 @@
             {% if sub.notes %}
                 <p class="text-sm text-text-secondary dark:text-text-secondary-dark bg-background dark:bg-background-dark p-3 rounded-md"><b class="text-text-primary dark:text-text-primary-dark">ملاحظات المعلم:</b> {{ sub.notes }}</p>
             {% endif %}
-            <button class="open-recitation w-full text-center text-sm font-bold text-primary dark:text-success hover:underline mt-2"
-                data-task-id="{{ task.id }}"
-                data-title="إعادة {% if task.type == 'recitation' %}تسميع{% else %}مراجعة{% endif %}: {{ task.surah }}"
-                data-submit-url="{% url 'accounts:submit_task' task_type=task.type task_id=task.id %}">
-                إعادة المحاولة
-            </button>
+            <a href="{% url 'accounts:recitation_record' task_type=task.type task_id=task.id %}"
+            class="w-full block text-center text-sm font-bold text-primary dark:text-success hover:underline mt-2">
+            إعادة المحاولة
+            </a>
+
         </div>
     </div>
     {% endif %}

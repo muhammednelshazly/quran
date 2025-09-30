@@ -102,6 +102,8 @@
             </thead>
             <tbody class="divide-y divide-border-color dark:divide-border-color-dark">
                 {% for sub in submissions %}
+                {# --- بداية التعديل 1: تحديد نوع التسليم --- #}
+                {% with sub_type=sub.recitation|yesno:"recitation,review" %}
                 <tr class="submission-row hover:bg-background dark:hover:bg-background-dark/50 transition-colors" data-submission-id="{{ sub.id }}">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center gap-3">
@@ -128,18 +130,20 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-center">
                         {% if sub.status == 'submitted' %}
-                        <button class="js-grade-submission bg-primary hover:bg-primary/90 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors" data-submission-id="{{ sub.id }}">
+                        <button class="js-grade-submission bg-primary hover:bg-primary/90 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors" data-submission-id="{{ sub.id }}" data-submission-type="{{ sub_type }}">
                             <span class="material-symbols-outlined text-base">play_arrow</span>
                             <span>تقييم الآن</span>
                         </button>
                         {% elif sub.status == 'graded' %}
-                        <button class="js-grade-submission bg-primary/10 hover:bg-primary/20 text-primary dark:text-success dark:bg-success/20 dark:hover:bg-success/30 text-sm font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors" data-submission-id="{{ sub.id }}">
+                        <button class="js-grade-submission bg-primary/10 hover:bg-primary/20 text-primary dark:text-success dark:bg-success/20 dark:hover:bg-success/30 text-sm font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors" data-submission-id="{{ sub.id }}" data-submission-type="{{ sub_type }}">
                             <span class="material-symbols-outlined text-base">visibility</span>
                             <span>عرض التقييم</span>
                         </button>
                         {% endif %}
                     </td>
                 </tr>
+                {% endwith %} 
+                {# --- نهاية التعديل 1 --- #}
                 {% empty %}
                 <tr>
                     <td colspan="6" class="p-6 text-center text-text-secondary dark:text-text-secondary-dark">
@@ -150,8 +154,7 @@
             </tbody>
         </table>
     </div>
-    
-    </section>
+</section>
 {% endblock %}
 
 
@@ -227,17 +230,26 @@ document.addEventListener('DOMContentLoaded', function () {
         const gradeButton = event.target.closest('.js-grade-submission');
         if (gradeButton) {
             currentSubmissionId = gradeButton.dataset.submissionId;
+            
+            // --- بداية التعديل 2: جلب النوع وتحديث رابط الـ API ---
+            const submissionType = gradeButton.dataset.submissionType;
+            // --- نهاية التعديل 2 ---
+            
             const gradeForm = document.getElementById('gradeSubmissionForm');
             const gradeLoader = document.getElementById('modal-loader');
             const gradeContent = document.getElementById('modal-grade-content');
             
-            gradeForm.action = `/teacher/submission/${currentSubmissionId}/grade/`;
+            gradeForm.action = `/accounts/teacher/submission/${submissionType}/${currentSubmissionId}/grade/`;
+            
             gradeLoader.style.display = 'block';
             gradeContent.classList.add('hidden');
             openModal(gradeModal);
 
             try {
-                const response = await fetch(`/accounts/api/submission/${currentSubmissionId}/`);
+                // --- بداية التعديل 2: استخدام الرابط الجديد ---
+                const response = await fetch(`/accounts/api/submission/${submissionType}/${currentSubmissionId}/`);
+                // --- نهاية التعديل 2 ---
+
                 if (!response.ok) throw new Error('Failed to load data');
                 const data = await response.json();
 

@@ -180,7 +180,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
     
-    setRole('student'); // Default role
+    // احصل على الدور الذي تم اختياره قبل تحديث الصفحة (في حالة فشل تسجيل الدخول)
+    const lastSelectedRole = "{{ selected_role|default:'student' }}";
+    setRole(lastSelectedRole); // عيّن الدور بناءً على المحاولة الأخيرة أو الافتراضي "طالب"
     roleButtons.forEach(btn => btn.addEventListener('click', () => setRole(btn.dataset.role)));
     
     // --- Password Toggle Logic ---
